@@ -9,6 +9,7 @@ import cors from 'cors';
 dotenv.config();
 
 const app: Express = express();
+const hostname = '0.0.0.0';
 const port = 5001;
 
 app.use(cors());
@@ -130,3 +131,4 @@ app.use('/users', usersRoutes);
 
 
 httpServer.listen(port, () => console.log(`Server running on port: http://localhost:${port}`));
+
