@@ -10,7 +10,7 @@ import { type } from 'os';
 const { Client } = pkg;
 
 const profilesDbConfig = {
-  host: '192.168.1.153', // Your database host
+  host: 'dpg-cl670j1k857s73cp4glg-a', // Your database host
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_profiles', // Your database name,
@@ -18,7 +18,7 @@ const profilesDbConfig = {
 };
 
 const postsDbConfig = {
-  host: '192.168.1.153', // Your database host
+  host: 'dpg-cl670j1k857s73cp4glg-a', // Your database host
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_posts', // Your database name,
@@ -26,7 +26,7 @@ const postsDbConfig = {
 };
 
 const activitiesLogsDbConfig = {
-  host: '192.168.1.153', // Your database host
+  host: 'dpg-cl670j1k857s73cp4glg-a', // Your database host
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_activities_logs', // Your database name,
@@ -34,7 +34,7 @@ const activitiesLogsDbConfig = {
 };
 
 const keywordsDbConfig = {
-  host: '192.168.1.153', // Your database host
+  host: 'dpg-cl670j1k857s73cp4glg-a', // Your database host
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'keywords', // Your database name,
@@ -42,7 +42,7 @@ const keywordsDbConfig = {
 };
 
 const chatsDbConfig = {
-  host: '192.168.1.153', // Your database host
+  host: 'dpg-cl670j1k857s73cp4glg-a', // Your database host
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_chats', // Your database name,
