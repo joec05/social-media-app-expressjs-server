@@ -14,7 +14,7 @@ const profilesDbConfig = {
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_profiles', // Your database name,
-  port: 5433
+  port: 5432
 };
 
 const postsDbConfig = {
@@ -22,7 +22,7 @@ const postsDbConfig = {
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_posts', // Your database name,
-  port: 5433
+  port: 5432
 };
 
 const activitiesLogsDbConfig = {
@@ -30,7 +30,7 @@ const activitiesLogsDbConfig = {
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_activities_logs', // Your database name,
-  port: 5433
+  port: 5432
 };
 
 const keywordsDbConfig = {
@@ -38,7 +38,7 @@ const keywordsDbConfig = {
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'keywords', // Your database name,
-  port: 5433
+  port: 5432
 };
 
 const chatsDbConfig = {
@@ -46,7 +46,7 @@ const chatsDbConfig = {
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_chats', // Your database name,
-  port: 5433
+  port: 5432
 };
 
 const profilesClient = new Client(profilesDbConfig);
