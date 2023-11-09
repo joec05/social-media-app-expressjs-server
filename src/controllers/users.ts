@@ -50,19 +50,19 @@ const chatsDbConfig = {
 };
 
 const profilesClient = new Client(profilesDbConfig);
-profilesClient.connect();
+profilesClient.connect().catch(err => console.log(err));
 
 const postsClient = new Client(postsDbConfig);
-postsClient.connect();
+postsClient.connect().catch(err => console.log(err));
 
 const activitiesLogsClient = new Client(activitiesLogsDbConfig);
-activitiesLogsClient.connect();
+activitiesLogsClient.connect().catch(err => console.log(err));
 
 const keywordsClient = new Client(keywordsDbConfig);
-keywordsClient.connect();
+keywordsClient.connect().catch(err => console.log(err));
 
 const chatsClient = new Client(chatsDbConfig);
-chatsClient.connect();
+chatsClient.connect().catch(err => console.log(err));
 
 const usersRoutes = express.Router();
 const secretKey = 'e52bc407-7c31-464f-bce4-8057ce1383ae';
