@@ -7,6 +7,7 @@ import { createServer } from 'http';
 import cors from 'cors';
 dotenv.config();
 const app = express();
+const hostname = '0.0.0.0';
 const port = 5001;
 app.use(cors());
 app.get('/', (req, res) => {

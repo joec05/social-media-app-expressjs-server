@@ -50,15 +50,15 @@ const chatsDbConfig = {
     port: 5433
 };
 const profilesClient = new Client(profilesDbConfig);
-profilesClient.connect();
+profilesClient.connect().catch(err => console.log(err));
 const postsClient = new Client(postsDbConfig);
-postsClient.connect();
+postsClient.connect().catch(err => console.log(err));
 const activitiesLogsClient = new Client(activitiesLogsDbConfig);
-activitiesLogsClient.connect();
+activitiesLogsClient.connect().catch(err => console.log(err));
 const keywordsClient = new Client(keywordsDbConfig);
-keywordsClient.connect();
+keywordsClient.connect().catch(err => console.log(err));
 const chatsClient = new Client(chatsDbConfig);
-chatsClient.connect();
+chatsClient.connect().catch(err => console.log(err));
 const usersRoutes = express.Router();
 const secretKey = 'e52bc407-7c31-464f-bce4-8057ce1383ae';
 // Login route
@@ -177,6 +177,64 @@ usersRoutes.post('/signUp', (req, res) => __awaiter(void 0, void 0, void 0, func
             // Rollback the transaction if any error occurs
             yield profilesClient.query('ROLLBACK');
             yield postsClient.query('ROLLBACK');
+            console.error('Error inserting user data:', error);
+            // Send an error response to the profilesClient
+            res.json({ message: error.detail });
+        }
+    }
+    catch (error) {
+        console.error('Internal error inserting user data:', error);
+        yield profilesClient.query('ROLLBACK');
+        yield postsClient.query('ROLLBACK');
+        return res.json({ message: 'Internal Server Error' });
+    }
+}));
+usersRoutes.get('/checkAccountExistsSignUp', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { email, username } = req.body;
+    console.log(req.body);
+    try {
+        const checkAccountExistsQuery = `
+      SELECT * FROM basic_data.user_profile WHERE (email = $1 OR username = $2) AND suspended = $3 AND deleted = $4
+    `;
+        try {
+            const checkAccountExists = yield profilesClient.query(checkAccountExistsQuery, [
+                email, username, false, false
+            ]);
+            const accountExists = checkAccountExists.rowCount > 0;
+            res.json({ 'message': 'Successfully checked account existence', 'exists': accountExists });
+        }
+        catch (error) {
+            // Rollback the transaction if any error occurs
+            yield profilesClient.query('ROLLBACK');
+            console.error('Error inserting user data:', error);
+            // Send an error response to the profilesClient
+            res.json({ message: error.detail });
+        }
+    }
+    catch (error) {
+        console.error('Internal error inserting user data:', error);
+        yield profilesClient.query('ROLLBACK');
+        yield postsClient.query('ROLLBACK');
+        return res.json({ message: 'Internal Server Error' });
+    }
+}));
+usersRoutes.get('/checkAccountExists', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { userID } = req.body;
+    console.log(req.body);
+    try {
+        const checkAccountExistsQuery = `
+      SELECT * FROM basic_data.user_profile WHERE user_id = $1 AND suspended = $2 AND deleted = $3
+    `;
+        try {
+            const checkAccountExists = yield profilesClient.query(checkAccountExistsQuery, [
+                userID, false, false
+            ]);
+            const accountExists = checkAccountExists.rowCount > 0;
+            res.json({ 'message': 'Successfully checked account existence', 'exists': accountExists });
+        }
+        catch (error) {
+            // Rollback the transaction if any error occurs
+            yield profilesClient.query('ROLLBACK');
             console.error('Error inserting user data:', error);
             // Send an error response to the profilesClient
             res.json({ message: error.detail });

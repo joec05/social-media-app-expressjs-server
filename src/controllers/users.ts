@@ -10,43 +10,43 @@ import { type } from 'os';
 const { Client } = pkg;
 
 const profilesDbConfig = {
-  host: 'dpg-cl670j1k857s73cp4glg-a', // Your database host
+  host: '192.168.1.153', // Your database host
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_profiles', // Your database name,
-  port: 5432
+  port: 5433
 };
 
 const postsDbConfig = {
-  host: 'dpg-cl670j1k857s73cp4glg-a', // Your database host
+  host: '192.168.1.153', // Your database host
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_posts', // Your database name,
-  port: 5432
+  port: 5433
 };
 
 const activitiesLogsDbConfig = {
-  host: 'dpg-cl670j1k857s73cp4glg-a', // Your database host
+  host: '192.168.1.153', // Your database host
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_activities_logs', // Your database name,
-  port: 5432
+  port: 5433
 };
 
 const keywordsDbConfig = {
-  host: 'dpg-cl670j1k857s73cp4glg-a', // Your database host
+  host: '192.168.1.153', // Your database host
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'keywords', // Your database name,
-  port: 5432
+  port: 5433
 };
 
 const chatsDbConfig = {
-  host: 'dpg-cl670j1k857s73cp4glg-a', // Your database host
+  host: '192.168.1.153', // Your database host
   user: 'joec05', // Your database username
   password: 'josccarl123', // Your database password
   database: 'users_chats', // Your database name,
-  port: 5432
+  port: 5433
 };
 
 const profilesClient = new Client(profilesDbConfig);
@@ -200,6 +200,75 @@ usersRoutes.post('/signUp', async (req, res) => {
       // Rollback the transaction if any error occurs
       await profilesClient.query('ROLLBACK');
       await postsClient.query('ROLLBACK');
+      console.error('Error inserting user data:', error);
+    
+      // Send an error response to the profilesClient
+      res.json({ message: error.detail });
+    }    
+    
+  } catch (error) {
+    console.error('Internal error inserting user data:', error);
+    await profilesClient.query('ROLLBACK');
+    await postsClient.query('ROLLBACK');
+    return res.json({ message: 'Internal Server Error' });
+  }
+});
+
+usersRoutes.get('/checkAccountExistsSignUp', async (req, res) => {
+  const { 
+    email,
+    username
+  } = req.body;
+  console.log(req.body);
+
+  try {
+    const checkAccountExistsQuery = `
+      SELECT * FROM basic_data.user_profile WHERE (email = $1 OR username = $2) AND suspended = $3 AND deleted = $4
+    `;
+
+    try {
+      const checkAccountExists = await profilesClient.query(checkAccountExistsQuery, [
+        email, username, false, false
+      ]);
+      const accountExists = checkAccountExists.rowCount > 0;
+      res.json({'message': 'Successfully checked account existence', 'exists': accountExists});
+    } catch (error : any) {
+      // Rollback the transaction if any error occurs
+      await profilesClient.query('ROLLBACK');
+      console.error('Error inserting user data:', error);
+    
+      // Send an error response to the profilesClient
+      res.json({ message: error.detail });
+    }    
+    
+  } catch (error) {
+    console.error('Internal error inserting user data:', error);
+    await profilesClient.query('ROLLBACK');
+    await postsClient.query('ROLLBACK');
+    return res.json({ message: 'Internal Server Error' });
+  }
+});
+
+usersRoutes.get('/checkAccountExists', async (req, res) => {
+  const { 
+    userID
+  } = req.body;
+  console.log(req.body);
+
+  try {
+    const checkAccountExistsQuery = `
+      SELECT * FROM basic_data.user_profile WHERE user_id = $1 AND suspended = $2 AND deleted = $3
+    `;
+
+    try {
+      const checkAccountExists = await profilesClient.query(checkAccountExistsQuery, [
+        userID, false, false
+      ]);
+      const accountExists = checkAccountExists.rowCount > 0;
+      res.json({'message': 'Successfully checked account existence', 'exists': accountExists});
+    } catch (error : any) {
+      // Rollback the transaction if any error occurs
+      await profilesClient.query('ROLLBACK');
       console.error('Error inserting user data:', error);
     
       // Send an error response to the profilesClient
