@@ -4,10 +4,15 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import pkg from 'pg';
-import { group, profile } from 'console';
-import { create } from 'domain';
-import { type } from 'os';
 const { Client } = pkg;
+
+const username = 'joec05';
+
+const IP : String = '192.168.1.153';
+
+const PORT : number = 5433;
+
+const password : String = 'josccarl123';
 
 const profilesDbConfig = {
   host: '192.168.1.153', // Your database host
@@ -50,19 +55,19 @@ const chatsDbConfig = {
 };
 
 const profilesClient = new Client(profilesDbConfig);
-profilesClient.connect().catch(err => console.log(err));
+profilesClient.connect().catch(err => console.error(err));
 
 const postsClient = new Client(postsDbConfig);
-postsClient.connect().catch(err => console.log(err));
+postsClient.connect().catch(err => console.error(err));
 
 const activitiesLogsClient = new Client(activitiesLogsDbConfig);
-activitiesLogsClient.connect().catch(err => console.log(err));
+activitiesLogsClient.connect().catch(err => console.error(err));
 
 const keywordsClient = new Client(keywordsDbConfig);
-keywordsClient.connect().catch(err => console.log(err));
+keywordsClient.connect().catch(err => console.error(err));
 
 const chatsClient = new Client(chatsDbConfig);
-chatsClient.connect().catch(err => console.log(err));
+chatsClient.connect().catch(err => console.error(err));
 
 const usersRoutes = express.Router();
 const secretKey = 'e52bc407-7c31-464f-bce4-8057ce1383ae';
@@ -70,7 +75,6 @@ const secretKey = 'e52bc407-7c31-464f-bce4-8057ce1383ae';
 // Login route
 usersRoutes.post('/loginWithEmail', async (req, res) => {
   const { email, password } = req.body;
-  console.log(req.body);
   try {
     const checkEmailQuery = 'SELECT * FROM basic_data.user_profile WHERE email = $1 AND suspended = $2 AND deleted = $3';
     const existingUser = await profilesClient.query(checkEmailQuery, [email, false, false]);
@@ -108,11 +112,9 @@ usersRoutes.post('/loginWithEmail', async (req, res) => {
 
 usersRoutes.post('/loginWithUsername', async (req, res) => {
   const { username, password } = req.body;
-  console.log(req.body);
   try {
     const checkUsernameQuery = 'SELECT * FROM basic_data.user_profile WHERE username = $1 AND suspended = $2 AND deleted = $3';
     const existingUser = await profilesClient.query(checkUsernameQuery, [username, false, false]);
-
     if (existingUser.rows.length === 0) {
       return res.json({ message: 'Username not found' });
     }else{
@@ -120,14 +122,11 @@ usersRoutes.post('/loginWithUsername', async (req, res) => {
       const userId = user.user_id;
       const checkPasswordQuery = 'SELECT password FROM sensitive_data.user_password WHERE user_id = $1';
       const hashedPassword = await profilesClient.query(checkPasswordQuery, [userId]);
-
       if (hashedPassword.rows.length === 0) {
         return res.json({ message: 'Internal Server Error' });
       }else{
         const storedPassword = hashedPassword.rows[0].password;
-
         const passwordMatch = await bcrypt.compare(password, storedPassword);
-
         if (!passwordMatch) {
           return res.json({ message: 'Incorrect password' });
         }else{
@@ -152,19 +151,17 @@ usersRoutes.post('/signUp', async (req, res) => {
     password,
     birthDate
   } = req.body;
-  console.log(req.body);
 
   try {
-
     const userId = uuidv4();
     const hashed = await bcrypt.hash(password, 10);
 
     // Insert user data
     const insertUserProfileQuery = `
       INSERT INTO basic_data.user_profile (
-        user_id, name, username, email, profile_picture_link, date_joined, birth_date, private, verified, suspended, deleted
+        user_id, name, username, email, profile_picture_link, date_joined, birth_date, bio, private, verified, suspended, deleted
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `;
 
     const insertUserPasswordQuery = `
@@ -182,6 +179,7 @@ usersRoutes.post('/signUp', async (req, res) => {
         profilePicLink,
         new Date().toISOString(),
         birthDate,
+        '',
         false,
         false, 
         false,
@@ -190,19 +188,12 @@ usersRoutes.post('/signUp', async (req, res) => {
     
       await profilesClient.query(insertUserPasswordQuery, [userId, hashed]);
       await profilesClient.query('COMMIT');
-    
       const token = jwt.sign({ userId }, secretKey, { expiresIn: '1h' });
-      console.log(token);
-      // Send a success response to the profilesClient
+      
       res.json({ message: 'Successfully signed up', token: token, userID: userId});
-      console.log('User data inserted successfully');
     } catch (error : any) {
-      // Rollback the transaction if any error occurs
       await profilesClient.query('ROLLBACK');
-      await postsClient.query('ROLLBACK');
-      console.error('Error inserting user data:', error);
-    
-      // Send an error response to the profilesClient
+      console.error('Error inserting user data:', error);    
       res.json({ message: error.detail });
     }    
     
@@ -219,13 +210,11 @@ usersRoutes.get('/checkAccountExistsSignUp', async (req, res) => {
     email,
     username
   } = req.body;
-  console.log(req.body);
 
   try {
     const checkAccountExistsQuery = `
       SELECT * FROM basic_data.user_profile WHERE (email = $1 OR username = $2) AND suspended = $3 AND deleted = $4
     `;
-
     try {
       const checkAccountExists = await profilesClient.query(checkAccountExistsQuery, [
         email, username, false, false
@@ -253,13 +242,11 @@ usersRoutes.get('/checkAccountExists', async (req, res) => {
   const { 
     userID
   } = req.body;
-  console.log(req.body);
 
   try {
     const checkAccountExistsQuery = `
       SELECT * FROM basic_data.user_profile WHERE user_id = $1 AND suspended = $2 AND deleted = $3
     `;
-
     try {
       const checkAccountExists = await profilesClient.query(checkAccountExistsQuery, [
         userID, false, false
@@ -289,7 +276,7 @@ usersRoutes.post('/completeSignUpProfile', async (req, res) => {
     profilePicLink,
     bio
   } = req.body;
-  console.log(req.body);
+  
   try {
     const insertUserProfileQuery = `
       UPDATE basic_data.user_profile
@@ -306,7 +293,7 @@ usersRoutes.post('/completeSignUpProfile', async (req, res) => {
       ]);
       await profilesClient.query('COMMIT');
       res.json({ message: 'Successfully updated your account'});
-      console.log('User data inserted successfully');
+      
     } catch (error) {
       // Rollback the transaction if any error occurs
       await profilesClient.query('ROLLBACK');
@@ -334,7 +321,7 @@ usersRoutes.post('/uploadPost', async (req, res) => {
     taggedUsers
   } = req.body;
 
-  console.log(req.body);
+  
 
   try {
     const insertPostDataQuery = `
@@ -346,21 +333,6 @@ usersRoutes.post('/uploadPost', async (req, res) => {
 
     //var uuidArr = new Array(1500000).fill(0).map(() => uuidv4());
     //var contentsArr = new Array(1500000).fill(0).map((e, i) => `fanatic ${Math.random() * 100000} gate ${i}`);
-    const insertPostDataQuery2 = `
-      INSERT INTO posts_list.posts_data (
-        post_id, type, content, sender, upload_time, medias_datas, deleted
-      )
-      SELECT
-      postid as post_id,
-      $1 as type,
-      content as content,
-      $2 as sender,
-      $3 as upload_time,
-      $4 as medias_datas,
-      $5 as deleted
-      FROM
-      unnest($6::text[], $7::text[]) as u(postid, content)
-    `;
 
     const insertUpdateHashtagQuery = `
       INSERT INTO hashtags.hashtags_list (
@@ -421,9 +393,9 @@ usersRoutes.post('/uploadPost', async (req, res) => {
       }
       await keywordsClient.query('COMMIT');
 
-      console.log('successful');
+      
       res.json({ message: 'Successfully uploaded the post'});
-      console.log('User data inserted successfully');
+      
     } catch (error) {
       // Rollback the transaction if any error occurs
       await postsClient.query('ROLLBACK');
@@ -555,7 +527,7 @@ async function getCompleteUserProfileData(userID: String, currentID: String){
     data: {basic_data: {}, socials_data: {}},
   };
   var currentIDInUserRequests = await getRequestsDataByUser(currentID, userID);
-  console.log(currentIDInUserRequests);
+  
   var relations = {
     muted_by_current_id: await isMutedByUser(currentID, userID),
     blocked_by_current_id: await isBlockedByUser(currentID, userID),
@@ -655,7 +627,7 @@ usersRoutes.get('/fetchCurrentUserProfile', async (req, res) => {
   const { 
     currentID
   } = req.body;
-  console.log(req.body);
+  
 
   try {
     res.json({message: "Successfully fetched data", 
@@ -674,7 +646,7 @@ usersRoutes.get('/fetchUserProfileSocials', async (req, res) => {
     userID,
     currentID,
   } = req.body;
-  console.log(req.body);
+  
   try {
     var completeProfileData = await getCompleteUserProfileData(userID, currentID);
     res.json({message: "Successfully fetched data", 
@@ -694,7 +666,7 @@ usersRoutes.get('/fetchUserProfileSocialsWithUsername', async (req, res) => {
     username,
     currentID
   } = req.body;
-  console.log(req.body);
+  
 
   try {
     var userProfileData = await getCompleteUserProfileDataWithUsername(username, currentID);
@@ -719,7 +691,7 @@ usersRoutes.patch('/editUserProfile', async (req, res) => {
     bio,
     birthDate
   } = req.body;
-  console.log(req.body);
+  
 
   try{
     const insertEditUserProfileQuery = `
@@ -734,7 +706,7 @@ usersRoutes.patch('/editUserProfile', async (req, res) => {
         userID, name, username, profilePicLink, bio, birthDate
       ]);
       await profilesClient.query('COMMIT');
-      console.log('succcessfully updated user profile');
+      
       res.json({ message: 'Successfully updated user profile'});
     } catch (error) {
       // Rollback the transaction if any error occurs
@@ -758,7 +730,7 @@ async function getPostEngagementsData(postID : String, sender : String, currentI
     currentID, postID
   ]);
   const postEngagementsData = fetchPostEngagementsData.rows[0];
-  console.log(postEngagementsData);
+  
   
 
   return {
@@ -771,23 +743,20 @@ async function getPostEngagementsData(postID : String, sender : String, currentI
 }
 
 async function getCommentEngagementsData(commentID : String, sender: String, currentID: String){
-  const fetchCommentLikesQuery = `SELECT user_id FROM likes_list.comments WHERE comment_id = $1`;
-  const fetchCommentLikes = await postsClient.query(fetchCommentLikesQuery, [commentID]);
-  const commentLikes : any = fetchCommentLikes.rows.map((e) => e.user_id);
-  const fetchCommentBookmarksQuery = `SELECT user_id FROM bookmarks_list.comments WHERE comment_id = $1`;
-  const fetchCommentBookmarks = await postsClient.query(fetchCommentBookmarksQuery, [commentID]);
-  const commentBookmarks : any = fetchCommentBookmarks.rows.map((e) => e.user_id);
+  const fetchCommentEngagementsDataQuery = `SELECT * FROM public."fetch_comment_engagements"($1, $2)`;
+  const fetchCommentEngagementsData = await postsClient.query(fetchCommentEngagementsDataQuery, [
+    currentID, commentID
+  ]);
+  const commentEngagementsData = fetchCommentEngagementsData.rows[0];
   
-  const fetchCommentCommentsQuery = `SELECT COUNT(*) FROM comments_list.comments_data WHERE parent_post_id = $1 AND parent_post_sender = $2 AND deleted = false`;
-  const fetchCommentComments = await postsClient.query(fetchCommentCommentsQuery, [commentID, sender]);
-  const commentComments : any = Number(fetchCommentComments.rows[0].count);
+  
 
   return {
-    'liked_by_current_id': commentLikes.includes(currentID),
-    'likes_count': commentLikes.length,
-    'bookmarked_by_current_id': commentBookmarks.includes(currentID),
-    'bookmarks_count': commentBookmarks.length,
-    'comments_count': commentComments
+    'liked_by_current_id': commentEngagementsData.liked_by_current_id,
+    'likes_count': commentEngagementsData.likes_count,
+    'bookmarked_by_current_id': commentEngagementsData.bookmarked_by_current_id,
+    'bookmarks_count': commentEngagementsData.bookmarks_count,
+    'comments_count': commentEngagementsData.comments_count
   }
 }
 
@@ -798,8 +767,8 @@ async function getPostsListFilteredData(dataList : any, currentID : String){
   var usersID : String[] = [];
   var blacklistedUsersID : String[] = [];
   for(var i = 0; i < dataList.length; i++){
-    console.log(dataList[i].sender);
-    console.log(dataList[i].parent_post_sender);
+    
+    
     if(dataList[i].type == 'post'){
       var postData = dataList[i];
       if(!usersID.includes(postData.sender) && !blacklistedUsersID.includes(postData.sender)){
@@ -948,7 +917,6 @@ async function getUsersListCompleteData(dataList : any, currentID : String){
   var usersProfileData = [];
   var usersSocialsData = [];
   var usersID : String[] = [];
-  var blacklistedUsersID : String[] = [];
   for(var i = 0; i < dataList.length; i++){
     var userID = dataList[i];
     if(!usersID.includes(userID)){
@@ -999,7 +967,7 @@ usersRoutes.get('/fetchUserPosts', async (req, res) => {
     paginationLimit,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
 
   try {
     const fetchUserIDPostsDataQuery = `SELECT * FROM posts_list.posts_data WHERE sender = $1 AND deleted = false ORDER BY upload_time DESC OFFSET $2 LIMIT $3`;
@@ -1010,13 +978,13 @@ usersRoutes.get('/fetchUserPosts', async (req, res) => {
     if(dataLength > paginationLimit){
       userIDPostsData.pop();
     }
-    console.log(userIDPostsData.length);
+    
     
     var getCompletePostsData = await getPostsListFilteredData(userIDPostsData, currentID);
     const completePostsList = getCompletePostsData.completeDataList; 
     const usersProfileData = getCompletePostsData.usersProfileData;
     const usersSocialsData = getCompletePostsData.usersSocialsData;
-    console.log(usersProfileData.length);
+    
     res.json({
       message: "Successfully fetched data", 
       userPostsData: completePostsList, 
@@ -1025,7 +993,7 @@ usersRoutes.get('/fetchUserPosts', async (req, res) => {
       usersSocialsData: usersSocialsData
     });
 
-    console.log('successfully fetched data');
+    
     
   } catch (error) {
     console.error('Error fetching user data:', error);
@@ -1042,7 +1010,7 @@ usersRoutes.get('/fetchUserComments', async (req, res) => {
     paginationLimit,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
 
   try {
     const fetchUserIDRepliesDataQuery = `SELECT * FROM comments_list.comments_data WHERE sender = $1 AND deleted = false ORDER BY upload_time DESC OFFSET $2 LIMIT $3`;
@@ -1075,31 +1043,31 @@ usersRoutes.get('/fetchUserComments', async (req, res) => {
 
 usersRoutes.get('/fetchUserBookmarks', async (req, res) => {
   const { 
-    userID,
     currentID,
     currentLength,
     paginationLimit,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
 
   try {
-    const fetchBookmarksDataQuery = `SELECT * FROM public."fetch_user_bookmarks"($1, $2, $3)`;
+    const fetchBookmarksDataQuery = `SELECT * FROM public."fetch_user_bookmarks"($1, $2, $3, $4, $5, $6, $7)`;
     const fetchBookmarksData = await postsClient.query(fetchBookmarksDataQuery, [
       currentID,
       currentLength, 
-      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+      username, IP, PORT, password
     ]);
     const bookmarksData = fetchBookmarksData.rows;
-    console.log(bookmarksData);
+    
     
     const dataLength = bookmarksData.length;
     if(dataLength > paginationLimit){
       bookmarksData.pop();
     };
-    console.log(bookmarksData);
+    
     bookmarksData.forEach((e, i) => {
-      bookmarksData[i] = e.original_post_data
+      bookmarksData[i] = e.post_data
     });
     var getCompletePostsData = await getPostsListCompleteData(bookmarksData, currentID);
     const completePostsList = getCompletePostsData.completeDataList; 
@@ -1126,10 +1094,15 @@ usersRoutes.get('/fetchFeed', async (req, res) => {
     paginationLimit,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
   try{
-    const fetchFollowingDataQuery = `SELECT * FROM public."fetch_feed_ids" ($1, $2, $3)`;
-    const fetchFollowingData = await profilesClient.query(fetchFollowingDataQuery, [userID, 0, maxFetchLimit]);
+    const fetchFollowingDataQuery = `SELECT * FROM public."fetch_feed" ($1, $2, $3, $4, $5, $6, $7)`;
+    const fetchFollowingData = await postsClient.query(fetchFollowingDataQuery, [
+      userID, 0, maxFetchLimit, username, IP, PORT, password
+    ]);
+    for(var i = 0; i < 50; i++){
+      
+    }
     const feedPosts : String[] = fetchFollowingData.rows.map((e) => e.post_data);
     const totalPostsLength = Math.min(maxFetchLimit, feedPosts.length);
     var modifiedFeedPosts = [...feedPosts];
@@ -1146,97 +1119,7 @@ usersRoutes.get('/fetchFeed', async (req, res) => {
       usersSocialsData.push(currentUserCompleteData.data.socials_data);
     }
 
-    console.log('successfully fetched feed');
-    res.json({
-      'message': "Successfully fetched data",
-      'usersProfileData': usersProfileData,
-      'usersSocialsData': usersSocialsData,
-      'feedPosts': feedPosts,
-      'modifiedFeedPosts': completePostsList,
-      'totalPostsLength': totalPostsLength,
-    })
-  } catch (error) {
-    console.error('Error fetching user data:', error);
-    await profilesClient.query('ROLLBACK');
-    return res.json({ message: 'Internal Server Error' });
-  }
-});
-
-usersRoutes.get('/fetchFeedPosts', async (req, res) => {
-  const {
-    userID,
-    currentLength,
-    paginationLimit,
-    maxFetchLimit
-  } = req.body;
-  console.log(req.body);
-  try{
-    const fetchFollowingDataQuery = `SELECT * FROM public."fetch_feed_posts_ids" ($1, $2, $3)`;
-    const fetchFollowingData = await profilesClient.query(fetchFollowingDataQuery, [userID, 0, maxFetchLimit]);
-    const feedPosts : String[] = fetchFollowingData.rows;
-    console.log(feedPosts.length);
-    const totalPostsLength = Math.min(maxFetchLimit, feedPosts.length);
-    var modifiedFeedPosts = [...feedPosts];
-    modifiedFeedPosts = modifiedFeedPosts.slice(0, Math.min(feedPosts.length - currentLength, paginationLimit));
     
-    var getCompletePostsData = await getPostsListFilteredData(modifiedFeedPosts, userID);
-    const completePostsList = getCompletePostsData.completeDataList; 
-    var usersProfileData : any[] = getCompletePostsData.usersProfileData;
-    var usersSocialsData = getCompletePostsData.usersSocialsData;
-
-    if(usersProfileData.find((e) => e.user_id == userID) == null){
-      var currentUserCompleteData = await getCompleteUserProfileData(userID, userID);
-      usersProfileData.push(currentUserCompleteData.data.basic_data);
-      usersSocialsData.push(currentUserCompleteData.data.socials_data);
-    }
-
-    console.log(feedPosts.length);
-    console.log('successfully fetched feed');
-    res.json({
-      'message': "Successfully fetched data",
-      'usersProfileData': usersProfileData,
-      'usersSocialsData': usersSocialsData,
-      'feedPosts': feedPosts,
-      'modifiedFeedPosts': completePostsList,
-      'totalPostsLength': totalPostsLength,
-    })
-  } catch (error) {
-    console.error('Error fetching user data:', error);
-    await profilesClient.query('ROLLBACK');
-    return res.json({ message: 'Internal Server Error' });
-  }
-});
-
-usersRoutes.get('/fetchFeedComments', async (req, res) => {
-  const {
-    userID,
-    currentLength,
-    paginationLimit,
-    maxFetchLimit
-  } = req.body;
-  console.log(req.body);
-  try{
-    const fetchFollowingDataQuery = `SELECT * FROM public."fetch_feed_comments_ids" ($1, $2, $3)`;
-    const fetchFollowingData = await profilesClient.query(fetchFollowingDataQuery, [userID, 0, maxFetchLimit]);
-    const feedPosts : String[] = fetchFollowingData.rows.map((e) => e.comment_data);
-    console.log(feedPosts.length);
-    const totalPostsLength = Math.min(maxFetchLimit, feedPosts.length);
-    var modifiedFeedPosts = [...feedPosts];
-    modifiedFeedPosts = modifiedFeedPosts.slice(0, Math.min(feedPosts.length - currentLength, paginationLimit));
-    
-    var getCompletePostsData = await getPostsListFilteredData(modifiedFeedPosts, userID);
-    const completePostsList = getCompletePostsData.completeDataList; 
-    var usersProfileData : any[] = getCompletePostsData.usersProfileData;
-    var usersSocialsData = getCompletePostsData.usersSocialsData;
-
-    if(usersProfileData.find((e) => e.user_id == userID) == null){
-      var currentUserCompleteData = await getCompleteUserProfileData(userID, userID);
-      usersProfileData.push(currentUserCompleteData.data.basic_data);
-      usersSocialsData.push(currentUserCompleteData.data.socials_data);
-    }
-
-    console.log(feedPosts.length);
-    console.log('successfully fetched feed');
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -1267,7 +1150,7 @@ usersRoutes.get('/fetchFeedPagination', async (req, res) => {
     const usersProfileData = getCompletePostsData.usersProfileData;
     const usersSocialsData = getCompletePostsData.usersSocialsData;
 
-    console.log('successfully fetched feed pagination');
+    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -1288,7 +1171,7 @@ usersRoutes.patch('/likePost', async (req, res) => {
     sender,
     postID,
   } = req.body;
-  console.log(req.body);
+  
   try {
     const insertLikePostQuery = `
       INSERT INTO likes_list.posts (
@@ -1324,7 +1207,7 @@ usersRoutes.patch('/likePost', async (req, res) => {
 
         await activitiesLogsClient.query('COMMIT');
 
-        console.log('succcessfully liked');
+        
         res.json({ message: 'Successfully liked the post'});
       }else{
         res.json({message: 'Failed to like'});
@@ -1352,7 +1235,7 @@ usersRoutes.patch('/unlikePost', async (req, res) => {
     sender,
     postID,
   } = req.body;
-  console.log(req.body);
+  
   try {
 
     const insertUnlikePostQuery = `
@@ -1393,7 +1276,7 @@ usersRoutes.patch('/bookmarkPost', async (req, res) => {
     sender,
     postID,
   } = req.body;
-  console.log(req.body);
+  
   try {
 
     const insertBookmarkPostQuery = `
@@ -1422,7 +1305,6 @@ usersRoutes.patch('/bookmarkPost', async (req, res) => {
     if(postDataList.length > 0){
       try {
         if(await userExists(sender) && !await isBlockedByUser(sender, currentID) && !await userIsPrivateAndNotFollowedByCurrentID(sender, currentID)){
-          var postData = postDataList[0];
           await postsClient.query('BEGIN');
           await postsClient.query(insertBookmarkPostQuery, [currentID, postID, sender, new Date()]);
           await postsClient.query('COMMIT');
@@ -1439,7 +1321,7 @@ usersRoutes.patch('/bookmarkPost', async (req, res) => {
           }
 
           await activitiesLogsClient.query('COMMIT');
-          console.log('succcessfully bookmarked');
+          
           res.json({ message: 'Successfully bookmarked the post'});
         }else{
           res.json({message: 'failed to bookmark'});
@@ -1472,7 +1354,7 @@ usersRoutes.patch('/unbookmarkPost', async (req, res) => {
     sender,
     postID,
   } = req.body;
-  console.log(req.body);
+  
   try {
 
     const deleteBookmarkFromTableQuery2 = `
@@ -1486,7 +1368,7 @@ usersRoutes.patch('/unbookmarkPost', async (req, res) => {
           currentID, postID
         ]);
         await postsClient.query('COMMIT');
-        console.log('succcessfully unbookmarked');
+        
         res.json({ message: 'Successfully unbookmarked the post'});
       }else{
         res.json({message: 'failed to unbookmark'})
@@ -1514,7 +1396,7 @@ usersRoutes.patch('/deletePost', async (req, res) => {
     sender,
     postID,
   } = req.body;
-  console.log(req.body);
+  
   try {
     const insertDeletePostQuery = `
       UPDATE posts_list.posts_data
@@ -1528,7 +1410,7 @@ usersRoutes.patch('/deletePost', async (req, res) => {
         sender, postID
       ]);
       await postsClient.query('COMMIT');
-      console.log('succcessfully deleted');
+      
       res.json({ message: 'Successfully deleted the post'});
     } catch (error) {
       // Rollback the transaction if any error occurs
@@ -1560,7 +1442,7 @@ usersRoutes.post('/uploadComment', async (req, res) => {
     taggedUsers
   } = req.body;
 
-  console.log(req.body);
+  
 
   try {
     const insertCommentDataQuery = `
@@ -1589,25 +1471,6 @@ usersRoutes.post('/uploadComment', async (req, res) => {
 
     //var uuidArr = new Array(1000000).fill(0).map(() => uuidv4());
     //var contentsArr = new Array(1000000).fill(0).map((e, i) => `codebase eminem ${Math.random() * 100000} elitshadye ${i}`);
-    const insertCommentDataQuery2 = `
-      INSERT INTO comments_list.comments_data (
-        comment_id, type, content, sender, upload_time, medias_datas, parent_post_type, 
-        parent_post_id, parent_post_sender, deleted
-      )
-      SELECT
-      commentid as comment_id,
-      $1 as type,
-      content as content,
-      $2 as sender,
-      $3 as upload_time,
-      $4 as medias_datas,
-      $5 as parent_post_type,
-      $6 as parent_post_id,
-      $7 as parent_post_sender,
-      $8 as deleted
-      FROM
-      unnest($9::text[], $10::text[]) as u(commentid, content)
-    `;
       
     try {
       if(await userExists(parentPostSender) && !await isBlockedByUser(parentPostSender, sender)){
@@ -1676,7 +1539,7 @@ usersRoutes.post('/uploadComment', async (req, res) => {
         }
         await keywordsClient.query('COMMIT');
 
-        console.log('successful');
+        
         res.json({ message: 'Successfully uploaded the comment'});
       }else{
         res.json({message: 'failed to comment'})
@@ -1704,7 +1567,7 @@ usersRoutes.patch('/likeComment', async (req, res) => {
     sender,
     commentID,
   } = req.body;
-  console.log(req.body);
+  
   try {
     const insertLikeCommentQuery = `
       INSERT INTO likes_list.comments (
@@ -1739,7 +1602,7 @@ usersRoutes.patch('/likeComment', async (req, res) => {
         }
 
         await activitiesLogsClient.query('COMMIT');
-        console.log('succcessfully liked');
+        
         res.json({ message: 'Successfully liked the comment'});
       }else{
         res.json({message: 'failed to like'})
@@ -1767,7 +1630,7 @@ usersRoutes.patch('/unlikeComment', async (req, res) => {
     sender,
     commentID,
   } = req.body;
-  console.log(req.body);
+  
   try {
     const insertUnlikeCommentQuery = `
       DELETE FROM likes_list.comments WHERE user_id = $1 AND comment_id = $2;
@@ -1807,7 +1670,7 @@ usersRoutes.patch('/bookmarkComment', async (req, res) => {
     sender,
     commentID,
   } = req.body;
-  console.log(req.body);
+  
   try {
 
     const insertBookmarkCommentQuery = `
@@ -1836,7 +1699,6 @@ usersRoutes.patch('/bookmarkComment', async (req, res) => {
     if(commentDataList.length > 0){
       try {
         if(await userExists(sender) && !await isBlockedByUser(sender, currentID) && !await userIsPrivateAndNotFollowedByCurrentID(sender, currentID)){
-          var commentData = commentDataList[0];
           await postsClient.query('BEGIN');
           await postsClient.query(insertBookmarkCommentQuery, [currentID, commentID, sender, new Date()]);
           await postsClient.query('COMMIT');
@@ -1852,7 +1714,7 @@ usersRoutes.patch('/bookmarkComment', async (req, res) => {
           }
 
           await activitiesLogsClient.query('COMMIT');
-          console.log('succcessfully bookmarked');
+          
           res.json({ message: 'Successfully bookmarked the comment'});
         }else{
           res.json({message: 'failed to bookmark'})
@@ -1885,7 +1747,7 @@ usersRoutes.patch('/unbookmarkComment', async (req, res) => {
     sender,
     commentID,
   } = req.body;
-  console.log(req.body);
+  
   try {
 
     const deleteBookmarkFromTableQuery2 = `
@@ -1900,7 +1762,7 @@ usersRoutes.patch('/unbookmarkComment', async (req, res) => {
           currentID, commentID
         ]);
         await postsClient.query('COMMIT');
-        console.log('succcessfully unbookmarked');
+        
         res.json({ message: 'Successfully unbookmarked the comment'});
       }else{
         res.json({message: 'failed to unbookmark'})
@@ -1926,12 +1788,8 @@ usersRoutes.patch('/unbookmarkComment', async (req, res) => {
 usersRoutes.patch('/deleteComment', async (req, res) => {
   const { 
     sender,
-    commentID,
-    parentPostType,
-    parentPostID,
-    parentPostSender
-  } = req.body;
-  console.log(req.body);
+    commentID  } = req.body;
+  
   try {
     const insertDeleteCommentQuery = `
       UPDATE comments_list.comments_data
@@ -1945,7 +1803,7 @@ usersRoutes.patch('/deleteComment', async (req, res) => {
         commentID
       ]);
       await postsClient.query('COMMIT');
-      console.log('succcessfully deleted');
+      
       res.json({ message: 'Successfully deleted the comment'});
     } catch (error) {
       // Rollback the transaction if any error occurs
@@ -1992,7 +1850,7 @@ async function followUser(followedID: String, followingID: String, filterPrivate
       ]);
       await activitiesLogsClient.query('COMMIT');
 
-      console.log('successfully followed');
+      
       return ({message: 'Successfully followed user'});
     }else{
       return ({message: 'User has been blocked'});
@@ -2020,7 +1878,7 @@ async function sendFollowRequest(requestedID: String, requestingID: String){
         requestingID, requestedID, new Date()
       ]);
       await profilesClient.query('COMMIT');
-      console.log('successfully requested');
+      
       return ({message: 'Successfully send request to user'});
     }else{
       return ({message: 'User has been blocked'});
@@ -2048,10 +1906,10 @@ usersRoutes.patch('/followUser', async (req, res) => {
     var message;
     await profilesClient.query('BEGIN');
     if(followedUserBasicData.private){
-      console.log('send follow reqiues');
+      
       message = await sendFollowRequest(followedID, currentID);
     }else{
-      console.log('follow directly');
+      
       message = await followUser(followedID, currentID, true);
     }
     await profilesClient.query('COMMIT');
@@ -2086,7 +1944,7 @@ usersRoutes.patch('/unfollowUser', async (req, res) => {
       ]);
       await profilesClient.query('COMMIT');
 
-      console.log('successfully followed');
+      
       res.json({message: 'Successfully followed user'});
     } catch (error) {
       // Rollback the transaction if any error occurs
@@ -2113,14 +1971,14 @@ usersRoutes.get('/fetchUserProfileFollowers', async(req, res) => {
     paginationLimit,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
   try {
     const fetchUserProfileFollowersQuery = `SELECT * FROM public."fetch_user_followers"($1, $2, $3, $4)`;
     const fetchUserProfileFollowers = await profilesClient.query(fetchUserProfileFollowersQuery, [
       userID,
       currentID,
       currentLength,
-      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
     ]);
     const userProfileFollowers = fetchUserProfileFollowers.rows.map((e) => e.user_id);
     
@@ -2151,7 +2009,7 @@ usersRoutes.get('/fetchUserProfileFollowing', async(req, res) => {
     paginationLimit ,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
   try {
     const fetchUserProfileFollowingQuery = `SELECT * FROM public."fetch_user_following"($1, $2, $3, $4)`;
     const fetchUserProfileFollowing = await profilesClient.query(fetchUserProfileFollowingQuery, [
@@ -2192,12 +2050,12 @@ usersRoutes.get('/fetchSelectedPostComments', async(req, res) => {
     maxFetchLimit
   } = req.body;
   try {
-    console.log(req.body);    
+    
 
     const fetchSelectedPostDataQuery = `SELECT * FROM posts_list.posts_data WHERE sender = $1 AND post_id = $2`;
     const fetchSelectedPostData = await postsClient.query(fetchSelectedPostDataQuery, [sender, postID]);
     var selectedPostData = fetchSelectedPostData.rows[0];
-    console.log('1');
+    
 
     var getCompleteUsersData = await getUsersListCompleteData([sender], currentID);
     var usersProfileData = getCompleteUsersData.usersProfileData;
@@ -2206,9 +2064,12 @@ usersRoutes.get('/fetchSelectedPostComments', async(req, res) => {
     const selectedPostEngagementsData = await getPostEngagementsData(selectedPostData.post_id, selectedPostData.sender, currentID);
     selectedPostData = {...selectedPostData, ...selectedPostEngagementsData};
 
-    const fetchPostCommentsQuery = `SELECT * FROM public."fetch_post_comments"($1, $2, $3, $4)`;
-    const fetchPostComments = await postsClient.query(fetchPostCommentsQuery, [postID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))]);
-    const postComments = fetchPostComments.rows;
+    const fetchPostCommentsQuery = `SELECT * FROM public."fetch_post_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
+    const fetchPostComments = await postsClient.query(fetchPostCommentsQuery, [
+      postID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+      username, IP, PORT, password
+    ]);
+    const postComments = fetchPostComments.rows.map((e) => e.post_data);
     
     const dataLength = postComments.length;
     if(dataLength > paginationLimit){
@@ -2220,8 +2081,8 @@ usersRoutes.get('/fetchSelectedPostComments', async(req, res) => {
     usersProfileData.push(...getCompletePostsData.usersProfileData);
     usersSocialsData.push(...getCompletePostsData.usersSocialsData);
     
-    console.log('successfully fetching post data');
-    console.log(postComments.length);
+    
+    
 
     res.json({
       message: 'Successfully fetched data', usersProfileData: usersProfileData, 
@@ -2237,7 +2098,6 @@ usersRoutes.get('/fetchSelectedPostComments', async(req, res) => {
 
 usersRoutes.get('/fetchSelectedPostCommentsPagination', async(req, res) => {
   const { 
-    sender,
     postID,
     currentID,
     currentLength,
@@ -2245,11 +2105,13 @@ usersRoutes.get('/fetchSelectedPostCommentsPagination', async(req, res) => {
     maxFetchLimit
   } = req.body;
   try {
-    console.log(req.body);
-    var commentsData  : any = [];    
-    const fetchPostCommentsQuery = `SELECT * FROM public."fetch_post_comments"($1, $2, $3, $4)`;
-    const fetchPostComments = await postsClient.query(fetchPostCommentsQuery, [postID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))]);
-    const postComments = fetchPostComments.rows;
+    
+    const fetchPostCommentsQuery = `SELECT * FROM public."fetch_post_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
+    const fetchPostComments = await postsClient.query(fetchPostCommentsQuery, [
+      postID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+      username, IP, PORT, password
+    ]);
+    const postComments = fetchPostComments.rows.map((e) => e.post_data);
     
     const dataLength = postComments.length;
     if(dataLength > paginationLimit){
@@ -2261,7 +2123,7 @@ usersRoutes.get('/fetchSelectedPostCommentsPagination', async(req, res) => {
     const usersProfileData = getCompletePostsData.usersProfileData;
     const usersSocialsData = getCompletePostsData.usersSocialsData;
 
-    console.log('successfully fetching post data pagination');
+    
     res.json({
       message: 'Successfully fetched data', usersProfileData: usersProfileData, 
       usersSocialsData: usersSocialsData, commentsData: completePostsList,
@@ -2284,6 +2146,7 @@ usersRoutes.get('/fetchSelectedCommentComments', async(req, res) => {
     maxFetchLimit
   } = req.body;
   try {
+    
     const fetchSelectedCommentDataQuery = `SELECT * FROM comments_list.comments_data WHERE sender = $1 AND comment_id = $2`;
     const fetchSelectedCommentData = await postsClient.query(fetchSelectedCommentDataQuery, [sender, commentID]);
     var selectedCommentData = fetchSelectedCommentData.rows[0];
@@ -2300,13 +2163,14 @@ usersRoutes.get('/fetchSelectedCommentComments', async(req, res) => {
     const usersProfileData = getCompleteUsersData.usersProfileData;
     const usersSocialsData = getCompleteUsersData.usersSocialsData;
 
+    
+
     const fetchParentPostDataQuery = parentPostType == 'post' ?
       `SELECT * FROM posts_list.posts_data WHERE sender = $1 AND post_id = $2`
     : 
       `SELECT * FROM comments_list.comments_data WHERE sender = $1 AND comment_id = $2`;
     const fetchParentPostData = await postsClient.query(fetchParentPostDataQuery, [parentPostSender, parentPostID]);
     var parentPostData = fetchParentPostData.rows[0];
-
     const parentPostEngagementsData = parentPostType == 'post' ? 
       await getPostEngagementsData(parentPostData.post_id, parentPostData.sender, currentID)
     :
@@ -2314,9 +2178,14 @@ usersRoutes.get('/fetchSelectedCommentComments', async(req, res) => {
 
     parentPostData = {...parentPostData, ...parentPostEngagementsData};
 
-    const fetchCommentCommentsQuery = `SELECT * FROM public."fetch_comment_comments"($1, $2, $3, $4)`;
-    const fetchCommentComments = await postsClient.query(fetchCommentCommentsQuery, [commentID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))]);
-    const commentComments = fetchCommentComments.rows;
+    
+
+    const fetchCommentCommentsQuery = `SELECT * FROM public."fetch_comment_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
+    const fetchCommentComments = await postsClient.query(fetchCommentCommentsQuery, [
+      commentID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+      username, IP, PORT, password
+    ]);
+    const commentComments = fetchCommentComments.rows.map((e) => e.post_data);
     
     const dataLength = commentComments.length;
     if(dataLength > paginationLimit){
@@ -2328,7 +2197,7 @@ usersRoutes.get('/fetchSelectedCommentComments', async(req, res) => {
     usersProfileData.push(...getCompletePostsData.usersProfileData);
     usersSocialsData.push(...getCompletePostsData.usersSocialsData);
     
-    console.log('successfully fetching comment data');
+    
 
     res.json({
       message: 'Successfully fetched data', usersProfileData: usersProfileData, 
@@ -2345,7 +2214,6 @@ usersRoutes.get('/fetchSelectedCommentComments', async(req, res) => {
 
 usersRoutes.get('/fetchSelectedCommentCommentsPagination', async(req, res) => {
   const { 
-    sender,
     commentID,
     currentID,
     currentLength,
@@ -2353,10 +2221,12 @@ usersRoutes.get('/fetchSelectedCommentCommentsPagination', async(req, res) => {
     maxFetchLimit
   } = req.body;
   try {
-    var commentsData : any = [];
-    const fetchCommentCommentsQuery = `SELECT * FROM public."fetch_comment_comments"($1, $2, $3, $4)`;
-    const fetchCommentComments = await postsClient.query(fetchCommentCommentsQuery, [commentID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))]);
-    const commentComments = fetchCommentComments.rows;
+    const fetchCommentCommentsQuery = `SELECT * FROM public."fetch_comment_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
+    const fetchCommentComments = await postsClient.query(fetchCommentCommentsQuery, [
+      commentID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+      username, IP, PORT, password
+    ]);
+    const commentComments = fetchCommentComments.rows.map((e) => e.post_data);
     const dataLength = commentComments.length;
     if(dataLength > paginationLimit){
       commentComments.pop();
@@ -2367,8 +2237,8 @@ usersRoutes.get('/fetchSelectedCommentCommentsPagination', async(req, res) => {
     const usersProfileData = getCompletePostsData.usersProfileData;
     const usersSocialsData = getCompletePostsData.usersSocialsData;
     
-    console.log('successfully fetching comment data');
-    console.log(commentsData);
+    
+    
     res.json({
       message: 'Successfully fetched data', usersProfileData: usersProfileData, 
       usersSocialsData: usersSocialsData, commentsData: completePostsList,
@@ -2389,14 +2259,17 @@ usersRoutes.get('/fetchSearchedPosts', async (req, res) => {
     paginationLimit,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
   try{
-    const fetchSearchedPostsDataQuery = `SELECT * FROM public."fetch_searched_posts_ids"($1, $2, $3, $4)`;
-    const fetchSearchedPostsData = await profilesClient.query(fetchSearchedPostsDataQuery, [currentID, searchedText, currentLength, maxFetchLimit]);
+    const fetchSearchedPostsDataQuery = `SELECT * FROM public."fetch_searched_posts"($1, $2, $3, $4, $5, $6, $7, $8)`;
+    const fetchSearchedPostsData = await postsClient.query(fetchSearchedPostsDataQuery, [
+      currentID, searchedText, currentLength, maxFetchLimit,
+      username, IP, PORT, password
+    ]);
     const searchedPosts = fetchSearchedPostsData.rows.map((e) => e.post_data);
-    //console.log(searchedPosts);
+    //
     const totalPostsLength = Math.min(maxFetchLimit, searchedPosts.length);
-    console.log(totalPostsLength);
+    
     var modifiedSearchedPosts = [...searchedPosts];
     modifiedSearchedPosts = modifiedSearchedPosts.slice(currentLength, currentLength + Math.min(searchedPosts.length - currentLength, paginationLimit));
     var getCompletePostsData = await getPostsListFilteredData(modifiedSearchedPosts, currentID);
@@ -2404,9 +2277,9 @@ usersRoutes.get('/fetchSearchedPosts', async (req, res) => {
     const usersProfileData = getCompletePostsData.usersProfileData;
     const usersSocialsData = getCompletePostsData.usersSocialsData;
 
-    console.log(searchedPosts.length);
+    
 
-    console.log('successfully fetched searched posts');
+    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -2425,23 +2298,19 @@ usersRoutes.get('/fetchSearchedPosts', async (req, res) => {
 
 usersRoutes.get('/fetchSearchedPostsPagination', async (req, res) => {
   var {
-    searchedText,
     searchedPostsEncoded,
-    currentID,
-    currentLength,
-    paginationLimit
-  } = req.body;
+    currentID  } = req.body;
 
   try{
     var modifiedSearchedPosts = JSON.parse(searchedPostsEncoded);
-    console.log(modifiedSearchedPosts.length);
+    
     
     var getCompletePostsData = await getPostsListFilteredData(modifiedSearchedPosts, currentID);
     const completePostsList = getCompletePostsData.completeDataList; 
     const usersProfileData = getCompletePostsData.usersProfileData;
     const usersSocialsData = getCompletePostsData.usersSocialsData;
-    console.log(completePostsList.length);
-    console.log('successfully fetched searched pagination');
+    
+    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -2464,13 +2333,16 @@ usersRoutes.get('/fetchSearchedComments', async (req, res) => {
     paginationLimit,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
   try{
-    const fetchSearchedCommentsDataQuery = `SELECT * FROM public."fetch_searched_comments_ids"($1, $2, $3, $4)`;
-    const fetchSearchedCommentsData = await profilesClient.query(fetchSearchedCommentsDataQuery, [currentID, searchedText, currentLength, maxFetchLimit]);
-    const searchedComments = fetchSearchedCommentsData.rows.map((e) => e.comment_data);
+    const fetchSearchedCommentsDataQuery = `SELECT * FROM public."fetch_searched_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
+    const fetchSearchedCommentsData = await postsClient.query(fetchSearchedCommentsDataQuery, [
+      currentID, searchedText, currentLength, maxFetchLimit,
+      username, IP, PORT, password
+    ]);
+    const searchedComments = fetchSearchedCommentsData.rows.map((e) => e.post_data);
     const totalCommentsLength = Math.min(maxFetchLimit, searchedComments.length);
-    console.log(totalCommentsLength);
+    
 
     var modifiedSearchedComments = [...searchedComments];
     modifiedSearchedComments = modifiedSearchedComments.slice(currentLength, currentLength + Math.min(searchedComments.length - currentLength, paginationLimit));
@@ -2480,8 +2352,8 @@ usersRoutes.get('/fetchSearchedComments', async (req, res) => {
     const usersProfileData = getCompletePostsData.usersProfileData;
     const usersSocialsData = getCompletePostsData.usersSocialsData;
 
-    console.log(searchedComments.length);
-    console.log('successfully fetched searched comments');
+    
+    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -2500,12 +2372,8 @@ usersRoutes.get('/fetchSearchedComments', async (req, res) => {
 
 usersRoutes.get('/fetchSearchedCommentsPagination', async (req, res) => {
   var {
-    searchedText,
     searchedCommentsEncoded,
-    currentID,
-    currentLength,
-    paginationLimit
-  } = req.body;
+    currentID  } = req.body;
 
   try{
     var modifiedSearchedComments = JSON.parse(searchedCommentsEncoded);
@@ -2514,9 +2382,9 @@ usersRoutes.get('/fetchSearchedCommentsPagination', async (req, res) => {
     const completePostsList = getCompletePostsData.completeDataList; 
     const usersProfileData = getCompletePostsData.usersProfileData;
     const usersSocialsData = getCompletePostsData.usersSocialsData;
-    console.log(modifiedSearchedComments.length);
+    
 
-    console.log('successfully fetched searched pagination');
+    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -2538,7 +2406,7 @@ usersRoutes.get('/fetchSearchedUsers', async (req, res) => {
     paginationLimit,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
   try{
     const fetchSearchedUsersDataQuery = `SELECT user_id FROM basic_data.user_profile WHERE name LIKE '%${searchedText}%' OR username LIKE '%${searchedText}%'`;
     const fetchSearchedUsersData = await profilesClient.query(fetchSearchedUsersDataQuery, []);
@@ -2552,7 +2420,7 @@ usersRoutes.get('/fetchSearchedUsers', async (req, res) => {
     var getCompleteUsersData = await getUsersListCompleteData(modifiedSearchedUsers, currentID);
     const usersProfileData = getCompleteUsersData.usersProfileData;
     const usersSocialsData = getCompleteUsersData.usersSocialsData;
-    console.log('successfully fetched searched users');
+    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -2569,7 +2437,6 @@ usersRoutes.get('/fetchSearchedUsers', async (req, res) => {
 
 usersRoutes.get('/fetchSearchedUsersPagination', async (req, res) => {
   var {
-    searchedText,
     currentID,
     searchedUsersEncoded,
   } = req.body;
@@ -2581,7 +2448,7 @@ usersRoutes.get('/fetchSearchedUsersPagination', async (req, res) => {
     const usersProfileData = getCompleteUsersData.usersProfileData;
     const usersSocialsData = getCompleteUsersData.usersSocialsData;
     
-    console.log('successfully fetched searched paginate users');
+    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -2605,13 +2472,14 @@ usersRoutes.get('/fetchUserNotifications', async (req, res) => {
 
   try{
     const fetchUserNotificationsDataQuery = `
-      SELECT * FROM public."fetch_user_notifications"($1, $2, $3)
+      SELECT * FROM public."fetch_user_notifications"($1, $2, $3, $4, $5, $6, $7)
     `;
 
     const fetchUserNotificationsData = await activitiesLogsClient.query(fetchUserNotificationsDataQuery, [
-      currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+      currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+      username, IP, PORT, password
     ]);
-    var userNotificationsData = fetchUserNotificationsData.rows;
+    var userNotificationsData = fetchUserNotificationsData.rows.map((e) => e.notification_data);
     
     const dataLength = userNotificationsData.length;
     if(dataLength > paginationLimit){
@@ -2664,8 +2532,8 @@ usersRoutes.get('/fetchUserNotifications', async (req, res) => {
         const fetchPostDataQuery = `SELECT * FROM posts_list.posts_data WHERE sender = $1 AND post_id = $2`;
         const fetchPostData = await postsClient.query(fetchPostDataQuery, [currentID, notificationData.referenced_post_id]);
         const postData = fetchPostData.rows[0];
-        console.log(notificationData);
-        console.log(postData);
+        
+        
         extraData.content = postData.content;
         extraData.medias_datas = postData.medias_datas;
         extraData.post_deleted = postData.deleted;
@@ -2702,13 +2570,15 @@ usersRoutes.get('/fetchPostLikes', async (req, res) => {
   } = req.body;
 
   try{
-    const fetchPostLikesDataQuery = `SELECT * FROM public."fetch_post_likes"($1, $2, $3, $4)`;
+    const fetchPostLikesDataQuery = `SELECT * FROM public."fetch_post_likes"($1, $2, $3, $4, $5, $6, $7, $8)`;
     const fetchPostLikesData = await postsClient.query(fetchPostLikesDataQuery, [
       postID, 
       currentID,
       currentLength, 
-      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+      username, IP, PORT, password
     ]);
+    
     const postLikesData = fetchPostLikesData.rows.map((e) => e.user_id);
     
     const dataLength = postLikesData.length;
@@ -2743,12 +2613,13 @@ usersRoutes.get('/fetchPostBookmarks', async (req, res) => {
   } = req.body;
 
   try{
-    const fetchPostBookmarksDataQuery = `SELECT * FROM public."fetch_post_bookmarks"($1, $2, $3, $4)`;
+    const fetchPostBookmarksDataQuery = `SELECT * FROM public."fetch_post_bookmarks"($1, $2, $3, $4, $5, $6, $7, $8)`;
     const fetchPostBookmarksData = await postsClient.query(fetchPostBookmarksDataQuery, [
       postID,
       currentID,
       currentLength,
-      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+      username, IP, PORT, password
     ]);
     const postBookmarksData = fetchPostBookmarksData.rows.map((e) => e.user_id);
 
@@ -2784,12 +2655,13 @@ usersRoutes.get('/fetchCommentLikes', async (req, res) => {
   } = req.body;
 
   try{
-    const fetchCommentLikesDataQuery = `SELECT * FROM public."fetch_comment_likes"($1, $2, $3, $4)`;
+    const fetchCommentLikesDataQuery = `SELECT * FROM public."fetch_comment_likes"($1, $2, $3, $4, $5, $6, $7, $8)`;
     const fetchCommentLikesData = await postsClient.query(fetchCommentLikesDataQuery, [
       commentID, 
       currentID,
       currentLength,
-      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+      username, IP, PORT, password
     ]);
     const commentLikesData = fetchCommentLikesData.rows.map((e) => e.user_id);
     
@@ -2825,12 +2697,13 @@ usersRoutes.get('/fetchCommentBookmarks', async (req, res) => {
   } = req.body;
 
   try{
-    const fetchCommentBookmarksDataQuery = `SELECT * FROM public."fetch_comment_bookmarks"($1, $2, $3, $4)`;
+    const fetchCommentBookmarksDataQuery = `SELECT * FROM public."fetch_comment_bookmarks"($1, $2, $3, $4, $5, $6, $7, $8)`;
     const fetchCommentBookmarksData = await postsClient.query(fetchCommentBookmarksDataQuery, [
       commentID, 
       currentID,
       currentLength, 
-      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+      Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+      username, IP, PORT, password
     ]);
     const commentBookmarksData = fetchCommentBookmarksData.rows.map((e) => e.user_id);
 
@@ -2863,7 +2736,7 @@ usersRoutes.get('/fetchSearchedTagUsers', async (req, res) => {
     currentLength,
     paginationLimit
   } = req.body;
-  console.log(req.body);
+  
   try{
     const fetchSearchedUsersDataQuery = `SELECT user_id FROM public."fetch_searched_tag_users" ($1, $2, $3, $4)`;
     const fetchSearchedUsersData = await profilesClient.query(fetchSearchedUsersDataQuery, [
@@ -2873,7 +2746,7 @@ usersRoutes.get('/fetchSearchedTagUsers', async (req, res) => {
     var getCompleteUsersData = await getUsersListBasicData(searchedUsersData, currentID);
     const usersProfileData = getCompleteUsersData.usersProfileData.map((e) => e.data.basic_data);
     
-    console.log('successfully fetched searched users');
+    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -2889,7 +2762,7 @@ usersRoutes.get('/fetchTopHashtags', async (req, res) => {
   const {
     paginationLimit
   } = req.body;
-  console.log(req.body);
+  
   try{
     const fetchHashtagsDataQuery = `SELECT * FROM hashtags.hashtags_list ORDER BY hashtag_count DESC OFFSET $1 LIMIT $2`;
     const fetchHashtagsData = await keywordsClient.query(fetchHashtagsDataQuery, [0, paginationLimit]);
@@ -2926,7 +2799,7 @@ usersRoutes.patch('/muteUser', async (req, res) => {
           userID
         ]);
         await profilesClient.query('COMMIT');
-        console.log('successfully muted');
+        
         res.json({message: 'Successfully muted user'});
       }else{
         res.json({message: 'User doesnt exist'});
@@ -2966,7 +2839,7 @@ usersRoutes.patch('/unmuteUser', async (req, res) => {
         ]);
         await profilesClient.query('COMMIT');
 
-        console.log('successfully unmuted');
+        
         res.json({message: 'Successfully unmuted user'});
       }else{
         res.json({message: 'User doesnt exist'});
@@ -3013,7 +2886,7 @@ usersRoutes.patch('/blockUser', async (req, res) => {
         await profilesClient.query(deleteFollowRequestsHistory, [currentID, userID]);
         await profilesClient.query(deleteFollowRequestsHistory, [userID, currentID]);
         await profilesClient.query('COMMIT');
-        console.log('successfully blocked');
+        
         res.json({message: 'Successfully blocked user'});
       }else{
         res.json({message: 'User doenst exist'});
@@ -3053,7 +2926,7 @@ usersRoutes.patch('/unblockUser', async (req, res) => {
         ]);
         await profilesClient.query('COMMIT');
 
-        console.log('successfully unblocked');
+        
         res.json({message: 'Successfully unblocked user'});
       }else{
         res.json({message: 'User doesnt exist'});
@@ -3094,7 +2967,7 @@ usersRoutes.patch('/lockAccount', async (req, res) => {
       ]);
       await profilesClient.query('COMMIT');
 
-      console.log('successfully locked');
+      
       res.json({message: 'Successfully locked user'});
     } catch (error) {
       // Rollback the transaction if any error occurs
@@ -3117,7 +2990,7 @@ usersRoutes.patch('/unlockAccount', async (req, res) => {
   const { 
     currentID
   } = req.body;
-  console.log(req.body);
+  
   try{
     const insertUserPrivateQuery = `
       UPDATE basic_data.user_profile
@@ -3144,7 +3017,7 @@ usersRoutes.patch('/unlockAccount', async (req, res) => {
 
       for(var i = 0; i < allRequestsToCurrentID.length; i++){
         var userID = allRequestsToCurrentID[i];
-        console.log(userID);
+        
         const removeCurrentIDFromRequestFromQuery = `DELETE FROM follow_requests_users.follow_request_history WHERE requesting_id = $1 AND requested_id = $2`;
         await profilesClient.query(removeCurrentIDFromRequestFromQuery, [userID, currentID]);
         followUser(currentID, userID, false);
@@ -3152,7 +3025,7 @@ usersRoutes.patch('/unlockAccount', async (req, res) => {
 
       await profilesClient.query('COMMIT');
 
-      console.log('successfully unlocked');
+      
       res.json({message: 'Successfully unlocked user'});
     } catch (error) {
       // Rollback the transaction if any error occurs
@@ -3187,7 +3060,7 @@ usersRoutes.patch('/cancelFollowRequest', async (req, res) => {
           currentID, userID
         ]);
         await profilesClient.query('COMMIT');
-        console.log('successfully cancelled');
+        
         res.json({message: 'Successfully cancelled user'});
       }else{
         res.json({message: 'User doesnt exist'});
@@ -3225,7 +3098,7 @@ usersRoutes.patch('/rejectFollowRequest', async (req, res) => {
           userID, currentID
         ]);
         await profilesClient.query('COMMIT');
-        console.log('successfully rejectled');
+        
         res.json({message: 'Successfully rejectled user'});
       }else{
         res.json({message: 'User doesnt exist'});
@@ -3265,7 +3138,7 @@ usersRoutes.patch('/acceptFollowRequest', async (req, res) => {
         followUser(currentID, userID, false);
         
         await profilesClient.query('COMMIT');
-        console.log('successfully accepted');
+        
         res.json({message: 'Successfully accepted user'});
       }else{
         res.json({message: 'User doesnt exist'});
@@ -3294,7 +3167,7 @@ usersRoutes.get('/fetchFollowRequestsFromUser', async(req, res) => {
     paginationLimit ,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
   try {
     const fetchUserProfileFollowRequestsFromQuery = `SELECT * FROM public."fetch_follow_requests_from"($1, $2, $3)`;
     const fetchUserProfileFollowRequestsFrom = await profilesClient.query(fetchUserProfileFollowRequestsFromQuery, [
@@ -3336,7 +3209,7 @@ usersRoutes.get('/fetchFollowRequestsToUser', async(req, res) => {
     paginationLimit,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
   try {
     const fetchUserProfilefollowRequestsToQuery = `SELECT * FROM public."fetch_follow_requests_to"($1, $2, $3)`;
     const fetchUserProfilefollowRequestsTo = await profilesClient.query(fetchUserProfilefollowRequestsToQuery, [
@@ -3380,14 +3253,15 @@ usersRoutes.get('/fetchUserChats', async(req, res) => {
   } = req.body;
 
   const fetchUserChatsDataQuery = `
-    SELECT * FROM public."fetch_user_chats" ($1, $2, $3)
+    SELECT * FROM public."fetch_user_chats" ($1, $2, $3, $4, $5, $6, $7)
   `;
   const fetchUserChatsData = await chatsClient.query(fetchUserChatsDataQuery, [
     userID,
     currentLength,
-    Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+    Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)), 
+    username, IP, PORT, password
   ]);
-  const chatsData = fetchUserChatsData.rows;
+  const chatsData = fetchUserChatsData.rows.map((e) => e.chat_data);
 
   const dataLength = chatsData.length;
   if(dataLength > paginationLimit){
@@ -3424,7 +3298,7 @@ usersRoutes.get('/fetchUserChats', async(req, res) => {
         LIMIT 1
       `;
       const fetchLatestMessageData = await chatsClient.query(fetchLatestMessageDataQuery, [chatID, userID]);
-      console.log(fetchLatestMessageData.rows);
+      
       if(fetchLatestMessageData.rowCount > 0){
         const latestMessageData = fetchLatestMessageData.rows[0];
         chatsData[i].latest_message_upload_time = latestMessageData.upload_time;
@@ -3449,7 +3323,7 @@ usersRoutes.get('/fetchUserChats', async(req, res) => {
       const fetchLatestMessageData = await chatsClient.query(fetchLatestMessageDataQuery, [chatID, userID]);
       if(fetchLatestMessageData.rowCount > 0){
         const latestMessageData = fetchLatestMessageData.rows[0];
-        console.log(latestMessageData);
+        
         chatsData[i].latest_message_upload_time = latestMessageData.upload_time;
         chatsData[i].latest_message_id = latestMessageData.message_id;
         chatsData[i].latest_message_content = latestMessageData.content;
@@ -3491,7 +3365,7 @@ usersRoutes.get('/fetchUserChats', async(req, res) => {
     }
   }
 
-  console.log(chatsData);
+  
 
 
   res.json({
@@ -3526,7 +3400,7 @@ usersRoutes.get('/fetchPrivateChat', async(req, res) => {
         currentCompleteData.data.socials_data, recipientCompleteData.data.socials_data
       ];
       if(chatID == null){
-        console.log('chat id null');
+        
         const fetchChatDataQuery = `
           SELECT * FROM users_chats.chats_history
           WHERE user_id = $1 AND recipient = $2
@@ -3535,7 +3409,7 @@ usersRoutes.get('/fetchPrivateChat', async(req, res) => {
           currentID, recipient
         ]);
         const chatData = fetchChatData.rows[0];
-        console.log(fetchChatData);
+        
         if(chatData == undefined){
           res.json({
             'message': 'Chat history not found',
@@ -3552,7 +3426,7 @@ usersRoutes.get('/fetchPrivateChat', async(req, res) => {
 
       if(chatID != null || chatID != undefined){
 
-        console.log('chat id not null $chatID');
+        
 
         const fetchPrivateChatDataQuery = `
           SELECT * FROM private_messages.messages_history
@@ -3663,7 +3537,7 @@ usersRoutes.post('/sendPrivateMessage', async(req, res) => {
   } = req.body;
 
   try{
-    console.log(req.body);
+    
     if(await userExists(recipient) && !await isBlockedByUser(sender, recipient) && !await isBlockedByUser(recipient, sender)){
       if(chatID == null){
 
@@ -3769,7 +3643,6 @@ usersRoutes.patch('/deletePrivateChat', async(req, res) => {
 
 usersRoutes.patch('/deletePrivateMessage', async(req, res) => {
   const {
-    chatID,
     messageID,
     currentID
   } = req.body;
@@ -3794,7 +3667,6 @@ usersRoutes.patch('/deletePrivateMessage', async(req, res) => {
 
 usersRoutes.patch('/deletePrivateMessageForAll', async(req, res) => {
   const {
-    chatID,
     messageID,
     currentID,
     recipient
@@ -3826,19 +3698,19 @@ usersRoutes.get('/fetchSearchedChatUsers', async (req, res) => {
     currentLength,
     paginationLimit
   } = req.body;
-  console.log(req.body);
+  
   try{
     const fetchSearchedUsersDataQuery = `SELECT user_id FROM public."fetch_searched_chat_users" ($1, $2, $3, $4)`;
     const fetchSearchedUsersData = await profilesClient.query(fetchSearchedUsersDataQuery, [
       searchedText, currentID, currentLength, paginationLimit
     ]);
     var searchedUsersData : String[] = fetchSearchedUsersData.rows.map((e) => e.user_id);
-    console.log(searchedUsersData);    
+    
     var getCompleteUsersData = await getUsersListBasicData(searchedUsersData, currentID);
     const usersProfileData = getCompleteUsersData.usersProfileData.map((e) => e.data.basic_data);
-    console.log(usersProfileData);
     
-    console.log('successfully fetched searched users');
+    
+    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -3860,7 +3732,7 @@ usersRoutes.get('/fetchGroupChat', async(req, res) => {
   } = req.body;
   
   try{
-    console.log('chat id not null $chatID');
+    
 
     var membersProfileData : any = [];
     var membersSocialsData : any = [];
@@ -3949,7 +3821,7 @@ usersRoutes.get('/fetchGroupChatPagination', async(req, res) => {
   } = req.body;
   
   try{
-    console.log('chat id not null $chatID');
+    
 
     var membersProfileData : any = [];
     var membersSocialsData : any = [];
@@ -4126,7 +3998,6 @@ usersRoutes.patch('/deleteGroupChat', async(req, res) => {
 
 usersRoutes.patch('/deleteGroupMessage', async(req, res) => {
   const {
-    chatID,
     messageID,
     currentID
   } = req.body;
@@ -4151,14 +4022,13 @@ usersRoutes.patch('/deleteGroupMessage', async(req, res) => {
 
 usersRoutes.patch('/deleteGroupMessageForAll', async(req, res) => {
   const {
-    chatID,
     messageID,
     currentID,
     recipients
   } = req.body;
 
   try{
-    console.log(recipients);
+    
     recipients.push(currentID);
     const deleteMessageQuery = `
       UPDATE group_messages.messages_history
@@ -4187,7 +4057,7 @@ usersRoutes.patch('/editGroupProfileData', async(req, res) => {
   } = req.body;
 
   try{
-    console.log(req.body);
+    
     var name : String = newData.name;
     var profilePicLink : String = newData.profilePicLink;
     var description : String = newData.description;
@@ -4240,7 +4110,7 @@ usersRoutes.patch('/leaveGroup', async(req, res) => {
   } = req.body;
 
   try{
-    console.log(req.body);
+    
 
     const insertCurrentUserChatQuery = `
       INSERT INTO group_messages.messages_history(
@@ -4295,7 +4165,7 @@ usersRoutes.get('/fetchSearchedAddToGroupUsers', async (req, res) => {
     currentLength,
     paginationLimit
   } = req.body;
-  console.log(req.body);
+  
   try{
     const fetchSearchedUsersDataQuery = `SELECT user_id FROM public."fetch_searched_add_to_group_users" ($1, $2, $3, $4, $5)`;
     const fetchSearchedUsersData = await profilesClient.query(fetchSearchedUsersDataQuery, [
@@ -4305,7 +4175,7 @@ usersRoutes.get('/fetchSearchedAddToGroupUsers', async (req, res) => {
     var getCompleteUsersData = await getUsersListBasicData(searchedUsersData, currentID);
     const usersProfileData = getCompleteUsersData.usersProfileData.map((e) => e.data.basic_data);
     
-    console.log('successfully fetched searched users');
+    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -4327,7 +4197,7 @@ usersRoutes.patch('/addUsersToGroup', async(req, res) => {
   } = req.body;
 
   try{
-    console.log(req.body);
+    
     const deleteAllMessageQuery = `
       UPDATE group_messages.messages_history
       SET deleted_list = array_cat(deleted_list, $1)
@@ -4336,7 +4206,7 @@ usersRoutes.patch('/addUsersToGroup', async(req, res) => {
     await chatsClient.query(deleteAllMessageQuery, [addedUsersID, chatID]);
     
     var typesArr = addedUsersID.map((e : String) => `add_users_to_group_${e}`);
-    console.log(messagesID);
+    
     const insertCurrentUserChatQuery = `
       INSERT INTO group_messages.messages_history(
         chat_id, message_id, type, content, sender, upload_time, medias_datas, deleted_list
@@ -4405,7 +4275,7 @@ usersRoutes.get('/fetchGroupMembersData', async(req, res) => {
     paginationLimit,
     maxFetchLimit
   } = req.body;
-  console.log(req.body);
+  
   try {    
     usersID = usersID.slice(
       currentLength,
@@ -4435,7 +4305,7 @@ usersRoutes.patch('/editPost', async (req, res) => {
     hashtags,
     taggedUsers,
   } = req.body;
-  console.log(req.body);
+  
 
   try {
 
@@ -4499,9 +4369,9 @@ usersRoutes.patch('/editPost', async (req, res) => {
         }
         await keywordsClient.query('COMMIT');
 
-        console.log('successful');
+        
         res.json({ message: 'Successfully edited the post'});
-        console.log('User data inserted successfully');
+        
       } catch (error) {
         // Rollback the transaction if any error occurs
         await postsClient.query('ROLLBACK');
@@ -4526,14 +4396,12 @@ usersRoutes.patch('/editComment', async (req, res) => {
     content,
     sender,
     mediasDatas,
-    parentPostID,
     parentPostSender,
-    parentPostType,
     hashtags,
     taggedUsers
   } = req.body;
 
-  console.log(req.body);
+  
 
   try {
     const insertCommentDataQuery = `
@@ -4591,7 +4459,7 @@ usersRoutes.patch('/editComment', async (req, res) => {
         }
         await keywordsClient.query('COMMIT');
 
-        console.log('successful');
+        
         res.json({ message: 'Successfully edited the comment'});
       }else{
         res.json({message: 'failed to comment'})
@@ -4632,7 +4500,7 @@ usersRoutes.patch('/deleteAccount', async (req, res) => {
       ]);
       await profilesClient.query('COMMIT');
 
-      console.log('successfully deleted');
+      
       res.json({message: 'Successfully deleted user'});
     } catch (error) {
       // Rollback the transaction if any error occurs
@@ -4680,7 +4548,7 @@ usersRoutes.delete('/hardDeleteAccount', async (req, res) => {
   const getAllComments = await postsClient.query(getAllCommentsQuery, [currentID]);
   const allComments = getAllComments.rows;
 
-  console.log('1');
+  
 
   for(var i = 0; i < allPosts.length; i++){
     if(allPosts[i].type == 'post'){
@@ -4704,7 +4572,7 @@ usersRoutes.delete('/hardDeleteAccount', async (req, res) => {
     }
   }
 
-  console.log('2');
+  
 
   for(var i = 0; i < allComments.length; i++){
     var commentData = allComments[i];
@@ -4717,7 +4585,7 @@ usersRoutes.delete('/hardDeleteAccount', async (req, res) => {
     }
   }
 
-  console.log('3');
+  
 
   const deletePostsSchemaQuery = `
     DROP SCHEMA IF EXISTS "${currentID}" CASCADE;
@@ -4725,7 +4593,7 @@ usersRoutes.delete('/hardDeleteAccount', async (req, res) => {
 
   await postsClient.query(deletePostsSchemaQuery, []);
 
-  console.log('4');
+  
 
   for(var i = 0; i < usersSchemasList.length; i++){
     const deleteUsersDataQuery = `
@@ -4741,7 +4609,7 @@ usersRoutes.delete('/hardDeleteAccount', async (req, res) => {
     await activitiesLogsClient.query(deleteActivitiesLogsDataQuery, []);
   }
 
-  console.log('5');
+  
 
   const deleteUsersDataQuery = `
     DELETE FROM basic_data.user_profile WHERE user_id = $1;
@@ -4749,7 +4617,7 @@ usersRoutes.delete('/hardDeleteAccount', async (req, res) => {
 
   await profilesClient.query(deleteUsersDataQuery, [currentID]);
 
-  console.log('6');
+  
 
   const deleteUsersPasswordQuery = `
     DELETE FROM sensitive_data.user_password WHERE user_id = $1;

@@ -14,6 +14,10 @@ import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import pkg from 'pg';
 const { Client } = pkg;
+const username = 'joec05';
+const IP = '192.168.1.153';
+const PORT = 5433;
+const password = 'josccarl123';
 const profilesDbConfig = {
     host: '192.168.1.153',
     user: 'joec05',
@@ -101,20 +105,27 @@ usersRoutes.post('/loginWithUsername', (req, res) => __awaiter(void 0, void 0, v
     const { username, password } = req.body;
     console.log(req.body);
     try {
+        console.log('1');
         const checkUsernameQuery = 'SELECT * FROM basic_data.user_profile WHERE username = $1 AND suspended = $2 AND deleted = $3';
         const existingUser = yield profilesClient.query(checkUsernameQuery, [username, false, false]);
+        console.log('2');
         if (existingUser.rows.length === 0) {
+            console.log('2a');
             return res.json({ message: 'Username not found' });
         }
         else {
+            console.log('2b');
             const user = existingUser.rows[0];
             const userId = user.user_id;
             const checkPasswordQuery = 'SELECT password FROM sensitive_data.user_password WHERE user_id = $1';
             const hashedPassword = yield profilesClient.query(checkPasswordQuery, [userId]);
+            console.log('3');
             if (hashedPassword.rows.length === 0) {
+                console.log('3a');
                 return res.json({ message: 'Internal Server Error' });
             }
             else {
+                console.log('3b');
                 const storedPassword = hashedPassword.rows[0].password;
                 const passwordMatch = yield bcrypt.compare(password, storedPassword);
                 if (!passwordMatch) {
@@ -142,9 +153,9 @@ usersRoutes.post('/signUp', (req, res) => __awaiter(void 0, void 0, void 0, func
         // Insert user data
         const insertUserProfileQuery = `
       INSERT INTO basic_data.user_profile (
-        user_id, name, username, email, profile_picture_link, date_joined, birth_date, private, verified, suspended, deleted
+        user_id, name, username, email, profile_picture_link, date_joined, birth_date, bio, private, verified, suspended, deleted
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `;
         const insertUserPasswordQuery = `
       INSERT INTO sensitive_data.user_password (user_id, password)
@@ -160,6 +171,7 @@ usersRoutes.post('/signUp', (req, res) => __awaiter(void 0, void 0, void 0, func
                 profilePicLink,
                 new Date().toISOString(),
                 birthDate,
+                '',
                 false,
                 false,
                 false,
@@ -700,21 +712,18 @@ function getPostEngagementsData(postID, sender, currentID) {
 }
 function getCommentEngagementsData(commentID, sender, currentID) {
     return __awaiter(this, void 0, void 0, function* () {
-        const fetchCommentLikesQuery = `SELECT user_id FROM likes_list.comments WHERE comment_id = $1`;
-        const fetchCommentLikes = yield postsClient.query(fetchCommentLikesQuery, [commentID]);
-        const commentLikes = fetchCommentLikes.rows.map((e) => e.user_id);
-        const fetchCommentBookmarksQuery = `SELECT user_id FROM bookmarks_list.comments WHERE comment_id = $1`;
-        const fetchCommentBookmarks = yield postsClient.query(fetchCommentBookmarksQuery, [commentID]);
-        const commentBookmarks = fetchCommentBookmarks.rows.map((e) => e.user_id);
-        const fetchCommentCommentsQuery = `SELECT COUNT(*) FROM comments_list.comments_data WHERE parent_post_id = $1 AND parent_post_sender = $2 AND deleted = false`;
-        const fetchCommentComments = yield postsClient.query(fetchCommentCommentsQuery, [commentID, sender]);
-        const commentComments = Number(fetchCommentComments.rows[0].count);
+        const fetchCommentEngagementsDataQuery = `SELECT * FROM public."fetch_comment_engagements"($1, $2)`;
+        const fetchCommentEngagementsData = yield postsClient.query(fetchCommentEngagementsDataQuery, [
+            currentID, commentID
+        ]);
+        const commentEngagementsData = fetchCommentEngagementsData.rows[0];
+        console.log(commentEngagementsData);
         return {
-            'liked_by_current_id': commentLikes.includes(currentID),
-            'likes_count': commentLikes.length,
-            'bookmarked_by_current_id': commentBookmarks.includes(currentID),
-            'bookmarks_count': commentBookmarks.length,
-            'comments_count': commentComments
+            'liked_by_current_id': commentEngagementsData.liked_by_current_id,
+            'likes_count': commentEngagementsData.likes_count,
+            'bookmarked_by_current_id': commentEngagementsData.bookmarked_by_current_id,
+            'bookmarks_count': commentEngagementsData.bookmarks_count,
+            'comments_count': commentEngagementsData.comments_count
         };
     });
 }
@@ -986,11 +995,12 @@ usersRoutes.get('/fetchUserBookmarks', (req, res) => __awaiter(void 0, void 0, v
     const { userID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     console.log(req.body);
     try {
-        const fetchBookmarksDataQuery = `SELECT * FROM public."fetch_user_bookmarks"($1, $2, $3)`;
+        const fetchBookmarksDataQuery = `SELECT * FROM public."fetch_user_bookmarks"($1, $2, $3, $4, $5, $6, $7)`;
         const fetchBookmarksData = yield postsClient.query(fetchBookmarksDataQuery, [
             currentID,
             currentLength,
-            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+            username, IP, PORT, password
         ]);
         const bookmarksData = fetchBookmarksData.rows;
         console.log(bookmarksData);
@@ -1001,7 +1011,7 @@ usersRoutes.get('/fetchUserBookmarks', (req, res) => __awaiter(void 0, void 0, v
         ;
         console.log(bookmarksData);
         bookmarksData.forEach((e, i) => {
-            bookmarksData[i] = e.original_post_data;
+            bookmarksData[i] = e.post_data;
         });
         var getCompletePostsData = yield getPostsListCompleteData(bookmarksData, currentID);
         const completePostsList = getCompletePostsData.completeDataList;
@@ -1023,8 +1033,13 @@ usersRoutes.get('/fetchFeed', (req, res) => __awaiter(void 0, void 0, void 0, fu
     const { userID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     console.log(req.body);
     try {
-        const fetchFollowingDataQuery = `SELECT * FROM public."fetch_feed_ids" ($1, $2, $3)`;
-        const fetchFollowingData = yield profilesClient.query(fetchFollowingDataQuery, [userID, 0, maxFetchLimit]);
+        const fetchFollowingDataQuery = `SELECT * FROM public."fetch_feed" ($1, $2, $3, $4, $5, $6, $7)`;
+        const fetchFollowingData = yield postsClient.query(fetchFollowingDataQuery, [
+            userID, 0, maxFetchLimit, username, IP, PORT, password
+        ]);
+        for (var i = 0; i < 50; i++) {
+            console.log(fetchFollowingData.rows.length);
+        }
         const feedPosts = fetchFollowingData.rows.map((e) => e.post_data);
         const totalPostsLength = Math.min(maxFetchLimit, feedPosts.length);
         var modifiedFeedPosts = [...feedPosts];
@@ -1038,80 +1053,6 @@ usersRoutes.get('/fetchFeed', (req, res) => __awaiter(void 0, void 0, void 0, fu
             usersProfileData.push(currentUserCompleteData.data.basic_data);
             usersSocialsData.push(currentUserCompleteData.data.socials_data);
         }
-        console.log('successfully fetched feed');
-        res.json({
-            'message': "Successfully fetched data",
-            'usersProfileData': usersProfileData,
-            'usersSocialsData': usersSocialsData,
-            'feedPosts': feedPosts,
-            'modifiedFeedPosts': completePostsList,
-            'totalPostsLength': totalPostsLength,
-        });
-    }
-    catch (error) {
-        console.error('Error fetching user data:', error);
-        yield profilesClient.query('ROLLBACK');
-        return res.json({ message: 'Internal Server Error' });
-    }
-}));
-usersRoutes.get('/fetchFeedPosts', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
-    try {
-        const fetchFollowingDataQuery = `SELECT * FROM public."fetch_feed_posts_ids" ($1, $2, $3)`;
-        const fetchFollowingData = yield profilesClient.query(fetchFollowingDataQuery, [userID, 0, maxFetchLimit]);
-        const feedPosts = fetchFollowingData.rows;
-        console.log(feedPosts.length);
-        const totalPostsLength = Math.min(maxFetchLimit, feedPosts.length);
-        var modifiedFeedPosts = [...feedPosts];
-        modifiedFeedPosts = modifiedFeedPosts.slice(0, Math.min(feedPosts.length - currentLength, paginationLimit));
-        var getCompletePostsData = yield getPostsListFilteredData(modifiedFeedPosts, userID);
-        const completePostsList = getCompletePostsData.completeDataList;
-        var usersProfileData = getCompletePostsData.usersProfileData;
-        var usersSocialsData = getCompletePostsData.usersSocialsData;
-        if (usersProfileData.find((e) => e.user_id == userID) == null) {
-            var currentUserCompleteData = yield getCompleteUserProfileData(userID, userID);
-            usersProfileData.push(currentUserCompleteData.data.basic_data);
-            usersSocialsData.push(currentUserCompleteData.data.socials_data);
-        }
-        console.log(feedPosts.length);
-        console.log('successfully fetched feed');
-        res.json({
-            'message': "Successfully fetched data",
-            'usersProfileData': usersProfileData,
-            'usersSocialsData': usersSocialsData,
-            'feedPosts': feedPosts,
-            'modifiedFeedPosts': completePostsList,
-            'totalPostsLength': totalPostsLength,
-        });
-    }
-    catch (error) {
-        console.error('Error fetching user data:', error);
-        yield profilesClient.query('ROLLBACK');
-        return res.json({ message: 'Internal Server Error' });
-    }
-}));
-usersRoutes.get('/fetchFeedComments', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
-    try {
-        const fetchFollowingDataQuery = `SELECT * FROM public."fetch_feed_comments_ids" ($1, $2, $3)`;
-        const fetchFollowingData = yield profilesClient.query(fetchFollowingDataQuery, [userID, 0, maxFetchLimit]);
-        const feedPosts = fetchFollowingData.rows.map((e) => e.comment_data);
-        console.log(feedPosts.length);
-        const totalPostsLength = Math.min(maxFetchLimit, feedPosts.length);
-        var modifiedFeedPosts = [...feedPosts];
-        modifiedFeedPosts = modifiedFeedPosts.slice(0, Math.min(feedPosts.length - currentLength, paginationLimit));
-        var getCompletePostsData = yield getPostsListFilteredData(modifiedFeedPosts, userID);
-        const completePostsList = getCompletePostsData.completeDataList;
-        var usersProfileData = getCompletePostsData.usersProfileData;
-        var usersSocialsData = getCompletePostsData.usersSocialsData;
-        if (usersProfileData.find((e) => e.user_id == userID) == null) {
-            var currentUserCompleteData = yield getCompleteUserProfileData(userID, userID);
-            usersProfileData.push(currentUserCompleteData.data.basic_data);
-            usersSocialsData.push(currentUserCompleteData.data.socials_data);
-        }
-        console.log(feedPosts.length);
         console.log('successfully fetched feed');
         res.json({
             'message': "Successfully fetched data",
@@ -1849,7 +1790,7 @@ usersRoutes.get('/fetchUserProfileFollowers', (req, res) => __awaiter(void 0, vo
             userID,
             currentID,
             currentLength,
-            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
         ]);
         const userProfileFollowers = fetchUserProfileFollowers.rows.map((e) => e.user_id);
         const dataLength = userProfileFollowers.length;
@@ -1911,9 +1852,12 @@ usersRoutes.get('/fetchSelectedPostComments', (req, res) => __awaiter(void 0, vo
         var usersSocialsData = getCompleteUsersData.usersSocialsData;
         const selectedPostEngagementsData = yield getPostEngagementsData(selectedPostData.post_id, selectedPostData.sender, currentID);
         selectedPostData = Object.assign(Object.assign({}, selectedPostData), selectedPostEngagementsData);
-        const fetchPostCommentsQuery = `SELECT * FROM public."fetch_post_comments"($1, $2, $3, $4)`;
-        const fetchPostComments = yield postsClient.query(fetchPostCommentsQuery, [postID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))]);
-        const postComments = fetchPostComments.rows;
+        const fetchPostCommentsQuery = `SELECT * FROM public."fetch_post_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
+        const fetchPostComments = yield postsClient.query(fetchPostCommentsQuery, [
+            postID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+            username, IP, PORT, password
+        ]);
+        const postComments = fetchPostComments.rows.map((e) => e.post_data);
         const dataLength = postComments.length;
         if (dataLength > paginationLimit) {
             postComments.pop();
@@ -1941,9 +1885,12 @@ usersRoutes.get('/fetchSelectedPostCommentsPagination', (req, res) => __awaiter(
     try {
         console.log(req.body);
         var commentsData = [];
-        const fetchPostCommentsQuery = `SELECT * FROM public."fetch_post_comments"($1, $2, $3, $4)`;
-        const fetchPostComments = yield postsClient.query(fetchPostCommentsQuery, [postID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))]);
-        const postComments = fetchPostComments.rows;
+        const fetchPostCommentsQuery = `SELECT * FROM public."fetch_post_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
+        const fetchPostComments = yield postsClient.query(fetchPostCommentsQuery, [
+            postID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+            username, IP, PORT, password
+        ]);
+        const postComments = fetchPostComments.rows.map((e) => e.post_data);
         const dataLength = postComments.length;
         if (dataLength > paginationLimit) {
             postComments.pop();
@@ -1968,6 +1915,7 @@ usersRoutes.get('/fetchSelectedPostCommentsPagination', (req, res) => __awaiter(
 usersRoutes.get('/fetchSelectedCommentComments', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { sender, commentID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
+        console.log(req.body);
         const fetchSelectedCommentDataQuery = `SELECT * FROM comments_list.comments_data WHERE sender = $1 AND comment_id = $2`;
         const fetchSelectedCommentData = yield postsClient.query(fetchSelectedCommentDataQuery, [sender, commentID]);
         var selectedCommentData = fetchSelectedCommentData.rows[0];
@@ -1979,6 +1927,7 @@ usersRoutes.get('/fetchSelectedCommentComments', (req, res) => __awaiter(void 0,
         var getCompleteUsersData = yield getUsersListCompleteData([parentPostSender, sender], currentID);
         const usersProfileData = getCompleteUsersData.usersProfileData;
         const usersSocialsData = getCompleteUsersData.usersSocialsData;
+        console.log(selectedCommentData);
         const fetchParentPostDataQuery = parentPostType == 'post' ?
             `SELECT * FROM posts_list.posts_data WHERE sender = $1 AND post_id = $2`
             :
@@ -1990,9 +1939,13 @@ usersRoutes.get('/fetchSelectedCommentComments', (req, res) => __awaiter(void 0,
             :
                 yield getCommentEngagementsData(parentPostData.comment_id, parentPostData.sender, currentID);
         parentPostData = Object.assign(Object.assign({}, parentPostData), parentPostEngagementsData);
-        const fetchCommentCommentsQuery = `SELECT * FROM public."fetch_comment_comments"($1, $2, $3, $4)`;
-        const fetchCommentComments = yield postsClient.query(fetchCommentCommentsQuery, [commentID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))]);
-        const commentComments = fetchCommentComments.rows;
+        console.log('DSHDDJDD');
+        const fetchCommentCommentsQuery = `SELECT * FROM public."fetch_comment_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
+        const fetchCommentComments = yield postsClient.query(fetchCommentCommentsQuery, [
+            commentID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+            username, IP, PORT, password
+        ]);
+        const commentComments = fetchCommentComments.rows.map((e) => e.post_data);
         const dataLength = commentComments.length;
         if (dataLength > paginationLimit) {
             commentComments.pop();
@@ -2019,9 +1972,12 @@ usersRoutes.get('/fetchSelectedCommentCommentsPagination', (req, res) => __await
     const { sender, commentID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
         var commentsData = [];
-        const fetchCommentCommentsQuery = `SELECT * FROM public."fetch_comment_comments"($1, $2, $3, $4)`;
-        const fetchCommentComments = yield postsClient.query(fetchCommentCommentsQuery, [commentID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))]);
-        const commentComments = fetchCommentComments.rows;
+        const fetchCommentCommentsQuery = `SELECT * FROM public."fetch_comment_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
+        const fetchCommentComments = yield postsClient.query(fetchCommentCommentsQuery, [
+            commentID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+            username, IP, PORT, password
+        ]);
+        const commentComments = fetchCommentComments.rows.map((e) => e.post_data);
         const dataLength = commentComments.length;
         if (dataLength > paginationLimit) {
             commentComments.pop();
@@ -2048,8 +2004,11 @@ usersRoutes.get('/fetchSearchedPosts', (req, res) => __awaiter(void 0, void 0, v
     const { searchedText, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     console.log(req.body);
     try {
-        const fetchSearchedPostsDataQuery = `SELECT * FROM public."fetch_searched_posts_ids"($1, $2, $3, $4)`;
-        const fetchSearchedPostsData = yield profilesClient.query(fetchSearchedPostsDataQuery, [currentID, searchedText, currentLength, maxFetchLimit]);
+        const fetchSearchedPostsDataQuery = `SELECT * FROM public."fetch_searched_posts"($1, $2, $3, $4, $5, $6, $7, $8)`;
+        const fetchSearchedPostsData = yield postsClient.query(fetchSearchedPostsDataQuery, [
+            currentID, searchedText, currentLength, maxFetchLimit,
+            username, IP, PORT, password
+        ]);
         const searchedPosts = fetchSearchedPostsData.rows.map((e) => e.post_data);
         //console.log(searchedPosts);
         const totalPostsLength = Math.min(maxFetchLimit, searchedPosts.length);
@@ -2105,9 +2064,12 @@ usersRoutes.get('/fetchSearchedComments', (req, res) => __awaiter(void 0, void 0
     const { searchedText, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     console.log(req.body);
     try {
-        const fetchSearchedCommentsDataQuery = `SELECT * FROM public."fetch_searched_comments_ids"($1, $2, $3, $4)`;
-        const fetchSearchedCommentsData = yield profilesClient.query(fetchSearchedCommentsDataQuery, [currentID, searchedText, currentLength, maxFetchLimit]);
-        const searchedComments = fetchSearchedCommentsData.rows.map((e) => e.comment_data);
+        const fetchSearchedCommentsDataQuery = `SELECT * FROM public."fetch_searched_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
+        const fetchSearchedCommentsData = yield postsClient.query(fetchSearchedCommentsDataQuery, [
+            currentID, searchedText, currentLength, maxFetchLimit,
+            username, IP, PORT, password
+        ]);
+        const searchedComments = fetchSearchedCommentsData.rows.map((e) => e.post_data);
         const totalCommentsLength = Math.min(maxFetchLimit, searchedComments.length);
         console.log(totalCommentsLength);
         var modifiedSearchedComments = [...searchedComments];
@@ -2210,12 +2172,13 @@ usersRoutes.get('/fetchUserNotifications', (req, res) => __awaiter(void 0, void 
     const { currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
         const fetchUserNotificationsDataQuery = `
-      SELECT * FROM public."fetch_user_notifications"($1, $2, $3)
+      SELECT * FROM public."fetch_user_notifications"($1, $2, $3, $4, $5, $6, $7)
     `;
         const fetchUserNotificationsData = yield activitiesLogsClient.query(fetchUserNotificationsDataQuery, [
-            currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+            currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+            username, IP, PORT, password
         ]);
-        var userNotificationsData = fetchUserNotificationsData.rows;
+        var userNotificationsData = fetchUserNotificationsData.rows.map((e) => e.notification_data);
         const dataLength = userNotificationsData.length;
         if (dataLength > paginationLimit) {
             userNotificationsData.pop();
@@ -2299,13 +2262,15 @@ usersRoutes.get('/fetchUserNotifications', (req, res) => __awaiter(void 0, void 
 usersRoutes.get('/fetchPostLikes', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { postID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        const fetchPostLikesDataQuery = `SELECT * FROM public."fetch_post_likes"($1, $2, $3, $4)`;
+        const fetchPostLikesDataQuery = `SELECT * FROM public."fetch_post_likes"($1, $2, $3, $4, $5, $6, $7, $8)`;
         const fetchPostLikesData = yield postsClient.query(fetchPostLikesDataQuery, [
             postID,
             currentID,
             currentLength,
-            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+            username, IP, PORT, password
         ]);
+        console.log(fetchPostLikesData.rows);
         const postLikesData = fetchPostLikesData.rows.map((e) => e.user_id);
         const dataLength = postLikesData.length;
         if (dataLength > paginationLimit) {
@@ -2330,12 +2295,13 @@ usersRoutes.get('/fetchPostLikes', (req, res) => __awaiter(void 0, void 0, void 
 usersRoutes.get('/fetchPostBookmarks', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { postID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        const fetchPostBookmarksDataQuery = `SELECT * FROM public."fetch_post_bookmarks"($1, $2, $3, $4)`;
+        const fetchPostBookmarksDataQuery = `SELECT * FROM public."fetch_post_bookmarks"($1, $2, $3, $4, $5, $6, $7, $8)`;
         const fetchPostBookmarksData = yield postsClient.query(fetchPostBookmarksDataQuery, [
             postID,
             currentID,
             currentLength,
-            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+            username, IP, PORT, password
         ]);
         const postBookmarksData = fetchPostBookmarksData.rows.map((e) => e.user_id);
         const dataLength = postBookmarksData.length;
@@ -2361,12 +2327,13 @@ usersRoutes.get('/fetchPostBookmarks', (req, res) => __awaiter(void 0, void 0, v
 usersRoutes.get('/fetchCommentLikes', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { commentID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        const fetchCommentLikesDataQuery = `SELECT * FROM public."fetch_comment_likes"($1, $2, $3, $4)`;
+        const fetchCommentLikesDataQuery = `SELECT * FROM public."fetch_comment_likes"($1, $2, $3, $4, $5, $6, $7, $8)`;
         const fetchCommentLikesData = yield postsClient.query(fetchCommentLikesDataQuery, [
             commentID,
             currentID,
             currentLength,
-            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+            username, IP, PORT, password
         ]);
         const commentLikesData = fetchCommentLikesData.rows.map((e) => e.user_id);
         const dataLength = commentLikesData.length;
@@ -2392,12 +2359,13 @@ usersRoutes.get('/fetchCommentLikes', (req, res) => __awaiter(void 0, void 0, vo
 usersRoutes.get('/fetchCommentBookmarks', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { commentID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        const fetchCommentBookmarksDataQuery = `SELECT * FROM public."fetch_comment_bookmarks"($1, $2, $3, $4)`;
+        const fetchCommentBookmarksDataQuery = `SELECT * FROM public."fetch_comment_bookmarks"($1, $2, $3, $4, $5, $6, $7, $8)`;
         const fetchCommentBookmarksData = yield postsClient.query(fetchCommentBookmarksDataQuery, [
             commentID,
             currentID,
             currentLength,
-            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+            Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+            username, IP, PORT, password
         ]);
         const commentBookmarksData = fetchCommentBookmarksData.rows.map((e) => e.user_id);
         const dataLength = commentBookmarksData.length;
@@ -2847,14 +2815,15 @@ usersRoutes.get('/fetchFollowRequestsToUser', (req, res) => __awaiter(void 0, vo
 usersRoutes.get('/fetchUserChats', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     const fetchUserChatsDataQuery = `
-    SELECT * FROM public."fetch_user_chats" ($1, $2, $3)
+    SELECT * FROM public."fetch_user_chats" ($1, $2, $3, $4, $5, $6, $7)
   `;
     const fetchUserChatsData = yield chatsClient.query(fetchUserChatsDataQuery, [
         userID,
         currentLength,
-        Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))
+        Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
+        username, IP, PORT, password
     ]);
-    const chatsData = fetchUserChatsData.rows;
+    const chatsData = fetchUserChatsData.rows.map((e) => e.chat_data);
     const dataLength = chatsData.length;
     if (dataLength > paginationLimit) {
         chatsData.pop();
