@@ -54,21 +54,20 @@ const chatsDbConfig = {
     port: 5433
 };
 const profilesClient = new Client(profilesDbConfig);
-profilesClient.connect().catch(err => console.log(err));
+profilesClient.connect().catch(err => console.error(err));
 const postsClient = new Client(postsDbConfig);
-postsClient.connect().catch(err => console.log(err));
+postsClient.connect().catch(err => console.error(err));
 const activitiesLogsClient = new Client(activitiesLogsDbConfig);
-activitiesLogsClient.connect().catch(err => console.log(err));
+activitiesLogsClient.connect().catch(err => console.error(err));
 const keywordsClient = new Client(keywordsDbConfig);
-keywordsClient.connect().catch(err => console.log(err));
+keywordsClient.connect().catch(err => console.error(err));
 const chatsClient = new Client(chatsDbConfig);
-chatsClient.connect().catch(err => console.log(err));
+chatsClient.connect().catch(err => console.error(err));
 const usersRoutes = express.Router();
 const secretKey = 'e52bc407-7c31-464f-bce4-8057ce1383ae';
 // Login route
 usersRoutes.post('/loginWithEmail', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = req.body;
-    console.log(req.body);
     try {
         const checkEmailQuery = 'SELECT * FROM basic_data.user_profile WHERE email = $1 AND suspended = $2 AND deleted = $3';
         const existingUser = yield profilesClient.query(checkEmailQuery, [email, false, false]);
@@ -103,29 +102,21 @@ usersRoutes.post('/loginWithEmail', (req, res) => __awaiter(void 0, void 0, void
 }));
 usersRoutes.post('/loginWithUsername', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { username, password } = req.body;
-    console.log(req.body);
     try {
-        console.log('1');
         const checkUsernameQuery = 'SELECT * FROM basic_data.user_profile WHERE username = $1 AND suspended = $2 AND deleted = $3';
         const existingUser = yield profilesClient.query(checkUsernameQuery, [username, false, false]);
-        console.log('2');
         if (existingUser.rows.length === 0) {
-            console.log('2a');
             return res.json({ message: 'Username not found' });
         }
         else {
-            console.log('2b');
             const user = existingUser.rows[0];
             const userId = user.user_id;
             const checkPasswordQuery = 'SELECT password FROM sensitive_data.user_password WHERE user_id = $1';
             const hashedPassword = yield profilesClient.query(checkPasswordQuery, [userId]);
-            console.log('3');
             if (hashedPassword.rows.length === 0) {
-                console.log('3a');
                 return res.json({ message: 'Internal Server Error' });
             }
             else {
-                console.log('3b');
                 const storedPassword = hashedPassword.rows[0].password;
                 const passwordMatch = yield bcrypt.compare(password, storedPassword);
                 if (!passwordMatch) {
@@ -146,7 +137,6 @@ usersRoutes.post('/loginWithUsername', (req, res) => __awaiter(void 0, void 0, v
 // Signup route
 usersRoutes.post('/signUp', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { name, username, profilePicLink, email, password, birthDate } = req.body;
-    console.log(req.body);
     try {
         const userId = uuidv4();
         const hashed = yield bcrypt.hash(password, 10);
@@ -180,17 +170,11 @@ usersRoutes.post('/signUp', (req, res) => __awaiter(void 0, void 0, void 0, func
             yield profilesClient.query(insertUserPasswordQuery, [userId, hashed]);
             yield profilesClient.query('COMMIT');
             const token = jwt.sign({ userId }, secretKey, { expiresIn: '1h' });
-            console.log(token);
-            // Send a success response to the profilesClient
             res.json({ message: 'Successfully signed up', token: token, userID: userId });
-            console.log('User data inserted successfully');
         }
         catch (error) {
-            // Rollback the transaction if any error occurs
             yield profilesClient.query('ROLLBACK');
-            yield postsClient.query('ROLLBACK');
             console.error('Error inserting user data:', error);
-            // Send an error response to the profilesClient
             res.json({ message: error.detail });
         }
     }
@@ -203,7 +187,6 @@ usersRoutes.post('/signUp', (req, res) => __awaiter(void 0, void 0, void 0, func
 }));
 usersRoutes.get('/checkAccountExistsSignUp', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, username } = req.body;
-    console.log(req.body);
     try {
         const checkAccountExistsQuery = `
       SELECT * FROM basic_data.user_profile WHERE (email = $1 OR username = $2) AND suspended = $3 AND deleted = $4
@@ -232,7 +215,6 @@ usersRoutes.get('/checkAccountExistsSignUp', (req, res) => __awaiter(void 0, voi
 }));
 usersRoutes.get('/checkAccountExists', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userID } = req.body;
-    console.log(req.body);
     try {
         const checkAccountExistsQuery = `
       SELECT * FROM basic_data.user_profile WHERE user_id = $1 AND suspended = $2 AND deleted = $3
@@ -261,7 +243,6 @@ usersRoutes.get('/checkAccountExists', (req, res) => __awaiter(void 0, void 0, v
 }));
 usersRoutes.post('/completeSignUpProfile', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userId, profilePicLink, bio } = req.body;
-    console.log(req.body);
     try {
         const insertUserProfileQuery = `
       UPDATE basic_data.user_profile
@@ -277,7 +258,6 @@ usersRoutes.post('/completeSignUpProfile', (req, res) => __awaiter(void 0, void 
             ]);
             yield profilesClient.query('COMMIT');
             res.json({ message: 'Successfully updated your account' });
-            console.log('User data inserted successfully');
         }
         catch (error) {
             // Rollback the transaction if any error occurs
@@ -295,7 +275,6 @@ usersRoutes.post('/completeSignUpProfile', (req, res) => __awaiter(void 0, void 
 }));
 usersRoutes.post('/uploadPost', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { postId, content, sender, mediasDatas, hashtags, taggedUsers } = req.body;
-    console.log(req.body);
     try {
         const insertPostDataQuery = `
       INSERT INTO posts_list.posts_data (
@@ -305,21 +284,6 @@ usersRoutes.post('/uploadPost', (req, res) => __awaiter(void 0, void 0, void 0, 
     `;
         //var uuidArr = new Array(1500000).fill(0).map(() => uuidv4());
         //var contentsArr = new Array(1500000).fill(0).map((e, i) => `fanatic ${Math.random() * 100000} gate ${i}`);
-        const insertPostDataQuery2 = `
-      INSERT INTO posts_list.posts_data (
-        post_id, type, content, sender, upload_time, medias_datas, deleted
-      )
-      SELECT
-      postid as post_id,
-      $1 as type,
-      content as content,
-      $2 as sender,
-      $3 as upload_time,
-      $4 as medias_datas,
-      $5 as deleted
-      FROM
-      unnest($6::text[], $7::text[]) as u(postid, content)
-    `;
         const insertUpdateHashtagQuery = `
       INSERT INTO hashtags.hashtags_list (
         hashtag, hashtag_count
@@ -375,9 +339,7 @@ usersRoutes.post('/uploadPost', (req, res) => __awaiter(void 0, void 0, void 0, 
                 ]);
             }
             yield keywordsClient.query('COMMIT');
-            console.log('successful');
             res.json({ message: 'Successfully uploaded the post' });
-            console.log('User data inserted successfully');
         }
         catch (error) {
             // Rollback the transaction if any error occurs
@@ -522,7 +484,6 @@ function getCompleteUserProfileData(userID, currentID) {
             data: { basic_data: {}, socials_data: {} },
         };
         var currentIDInUserRequests = yield getRequestsDataByUser(currentID, userID);
-        console.log(currentIDInUserRequests);
         var relations = {
             muted_by_current_id: yield isMutedByUser(currentID, userID),
             blocked_by_current_id: yield isBlockedByUser(currentID, userID),
@@ -617,7 +578,6 @@ function getUserSocialsData(userID, currentID) {
 }
 usersRoutes.get('/fetchCurrentUserProfile', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID } = req.body;
-    console.log(req.body);
     try {
         res.json({ message: "Successfully fetched data",
             userProfileData: yield getBasicUserProfileData(currentID),
@@ -631,7 +591,6 @@ usersRoutes.get('/fetchCurrentUserProfile', (req, res) => __awaiter(void 0, void
 }));
 usersRoutes.get('/fetchUserProfileSocials', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userID, currentID, } = req.body;
-    console.log(req.body);
     try {
         var completeProfileData = yield getCompleteUserProfileData(userID, currentID);
         res.json({ message: "Successfully fetched data",
@@ -647,7 +606,6 @@ usersRoutes.get('/fetchUserProfileSocials', (req, res) => __awaiter(void 0, void
 }));
 usersRoutes.get('/fetchUserProfileSocialsWithUsername', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { username, currentID } = req.body;
-    console.log(req.body);
     try {
         var userProfileData = yield getCompleteUserProfileDataWithUsername(username, currentID);
         res.json({ message: "Successfully fetched data",
@@ -663,7 +621,6 @@ usersRoutes.get('/fetchUserProfileSocialsWithUsername', (req, res) => __awaiter(
 }));
 usersRoutes.patch('/editUserProfile', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userID, name, username, profilePicLink, bio, birthDate } = req.body;
-    console.log(req.body);
     try {
         const insertEditUserProfileQuery = `
       UPDATE basic_data.user_profile
@@ -676,7 +633,6 @@ usersRoutes.patch('/editUserProfile', (req, res) => __awaiter(void 0, void 0, vo
                 userID, name, username, profilePicLink, bio, birthDate
             ]);
             yield profilesClient.query('COMMIT');
-            console.log('succcessfully updated user profile');
             res.json({ message: 'Successfully updated user profile' });
         }
         catch (error) {
@@ -700,7 +656,6 @@ function getPostEngagementsData(postID, sender, currentID) {
             currentID, postID
         ]);
         const postEngagementsData = fetchPostEngagementsData.rows[0];
-        console.log(postEngagementsData);
         return {
             'liked_by_current_id': postEngagementsData.liked_by_current_id,
             'likes_count': postEngagementsData.likes_count,
@@ -717,7 +672,6 @@ function getCommentEngagementsData(commentID, sender, currentID) {
             currentID, commentID
         ]);
         const commentEngagementsData = fetchCommentEngagementsData.rows[0];
-        console.log(commentEngagementsData);
         return {
             'liked_by_current_id': commentEngagementsData.liked_by_current_id,
             'likes_count': commentEngagementsData.likes_count,
@@ -735,8 +689,6 @@ function getPostsListFilteredData(dataList, currentID) {
         var usersID = [];
         var blacklistedUsersID = [];
         for (var i = 0; i < dataList.length; i++) {
-            console.log(dataList[i].sender);
-            console.log(dataList[i].parent_post_sender);
             if (dataList[i].type == 'post') {
                 var postData = dataList[i];
                 if (!usersID.includes(postData.sender) && !blacklistedUsersID.includes(postData.sender)) {
@@ -891,7 +843,6 @@ function getUsersListCompleteData(dataList, currentID) {
         var usersProfileData = [];
         var usersSocialsData = [];
         var usersID = [];
-        var blacklistedUsersID = [];
         for (var i = 0; i < dataList.length; i++) {
             var userID = dataList[i];
             if (!usersID.includes(userID)) {
@@ -933,7 +884,6 @@ function getUsersListFilteredData(dataList, currentID) {
 }
 usersRoutes.get('/fetchUserPosts', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchUserIDPostsDataQuery = `SELECT * FROM posts_list.posts_data WHERE sender = $1 AND deleted = false ORDER BY upload_time DESC OFFSET $2 LIMIT $3`;
         const fetchUserIDPostsData = yield postsClient.query(fetchUserIDPostsDataQuery, [userID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1))]);
@@ -942,12 +892,10 @@ usersRoutes.get('/fetchUserPosts', (req, res) => __awaiter(void 0, void 0, void 
         if (dataLength > paginationLimit) {
             userIDPostsData.pop();
         }
-        console.log(userIDPostsData.length);
         var getCompletePostsData = yield getPostsListFilteredData(userIDPostsData, currentID);
         const completePostsList = getCompletePostsData.completeDataList;
         const usersProfileData = getCompletePostsData.usersProfileData;
         const usersSocialsData = getCompletePostsData.usersSocialsData;
-        console.log(usersProfileData.length);
         res.json({
             message: "Successfully fetched data",
             userPostsData: completePostsList,
@@ -955,7 +903,6 @@ usersRoutes.get('/fetchUserPosts', (req, res) => __awaiter(void 0, void 0, void 
             usersProfileData: usersProfileData,
             usersSocialsData: usersSocialsData
         });
-        console.log('successfully fetched data');
     }
     catch (error) {
         console.error('Error fetching user data:', error);
@@ -965,7 +912,6 @@ usersRoutes.get('/fetchUserPosts', (req, res) => __awaiter(void 0, void 0, void 
 }));
 usersRoutes.get('/fetchUserComments', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchUserIDRepliesDataQuery = `SELECT * FROM comments_list.comments_data WHERE sender = $1 AND deleted = false ORDER BY upload_time DESC OFFSET $2 LIMIT $3`;
         const fetchUserIDRepliesData = yield postsClient.query(fetchUserIDRepliesDataQuery, [
@@ -992,8 +938,7 @@ usersRoutes.get('/fetchUserComments', (req, res) => __awaiter(void 0, void 0, vo
     }
 }));
 usersRoutes.get('/fetchUserBookmarks', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
+    const { currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
         const fetchBookmarksDataQuery = `SELECT * FROM public."fetch_user_bookmarks"($1, $2, $3, $4, $5, $6, $7)`;
         const fetchBookmarksData = yield postsClient.query(fetchBookmarksDataQuery, [
@@ -1003,13 +948,11 @@ usersRoutes.get('/fetchUserBookmarks', (req, res) => __awaiter(void 0, void 0, v
             username, IP, PORT, password
         ]);
         const bookmarksData = fetchBookmarksData.rows;
-        console.log(bookmarksData);
         const dataLength = bookmarksData.length;
         if (dataLength > paginationLimit) {
             bookmarksData.pop();
         }
         ;
-        console.log(bookmarksData);
         bookmarksData.forEach((e, i) => {
             bookmarksData[i] = e.post_data;
         });
@@ -1031,14 +974,12 @@ usersRoutes.get('/fetchUserBookmarks', (req, res) => __awaiter(void 0, void 0, v
 }));
 usersRoutes.get('/fetchFeed', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchFollowingDataQuery = `SELECT * FROM public."fetch_feed" ($1, $2, $3, $4, $5, $6, $7)`;
         const fetchFollowingData = yield postsClient.query(fetchFollowingDataQuery, [
             userID, 0, maxFetchLimit, username, IP, PORT, password
         ]);
         for (var i = 0; i < 50; i++) {
-            console.log(fetchFollowingData.rows.length);
         }
         const feedPosts = fetchFollowingData.rows.map((e) => e.post_data);
         const totalPostsLength = Math.min(maxFetchLimit, feedPosts.length);
@@ -1053,7 +994,6 @@ usersRoutes.get('/fetchFeed', (req, res) => __awaiter(void 0, void 0, void 0, fu
             usersProfileData.push(currentUserCompleteData.data.basic_data);
             usersSocialsData.push(currentUserCompleteData.data.socials_data);
         }
-        console.log('successfully fetched feed');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -1077,7 +1017,6 @@ usersRoutes.get('/fetchFeedPagination', (req, res) => __awaiter(void 0, void 0, 
         const completePostsList = getCompletePostsData.completeDataList;
         const usersProfileData = getCompletePostsData.usersProfileData;
         const usersSocialsData = getCompletePostsData.usersSocialsData;
-        console.log('successfully fetched feed pagination');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -1093,7 +1032,6 @@ usersRoutes.get('/fetchFeedPagination', (req, res) => __awaiter(void 0, void 0, 
 }));
 usersRoutes.patch('/likePost', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID, sender, postID, } = req.body;
-    console.log(req.body);
     try {
         const insertLikePostQuery = `
       INSERT INTO likes_list.posts (
@@ -1123,7 +1061,6 @@ usersRoutes.patch('/likePost', (req, res) => __awaiter(void 0, void 0, void 0, f
                     }
                 }
                 yield activitiesLogsClient.query('COMMIT');
-                console.log('succcessfully liked');
                 res.json({ message: 'Successfully liked the post' });
             }
             else {
@@ -1146,7 +1083,6 @@ usersRoutes.patch('/likePost', (req, res) => __awaiter(void 0, void 0, void 0, f
 }));
 usersRoutes.patch('/unlikePost', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID, sender, postID, } = req.body;
-    console.log(req.body);
     try {
         const insertUnlikePostQuery = `
       DELETE FROM likes_list.posts WHERE user_id = $1 AND post_id = $2;
@@ -1180,7 +1116,6 @@ usersRoutes.patch('/unlikePost', (req, res) => __awaiter(void 0, void 0, void 0,
 }));
 usersRoutes.patch('/bookmarkPost', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID, sender, postID, } = req.body;
-    console.log(req.body);
     try {
         const insertBookmarkPostQuery = `
       INSERT INTO bookmarks_list.posts (
@@ -1204,7 +1139,6 @@ usersRoutes.patch('/bookmarkPost', (req, res) => __awaiter(void 0, void 0, void 
         if (postDataList.length > 0) {
             try {
                 if ((yield userExists(sender)) && !(yield isBlockedByUser(sender, currentID)) && !(yield userIsPrivateAndNotFollowedByCurrentID(sender, currentID))) {
-                    var postData = postDataList[0];
                     yield postsClient.query('BEGIN');
                     yield postsClient.query(insertBookmarkPostQuery, [currentID, postID, sender, new Date()]);
                     yield postsClient.query('COMMIT');
@@ -1217,7 +1151,6 @@ usersRoutes.patch('/bookmarkPost', (req, res) => __awaiter(void 0, void 0, void 
                         }
                     }
                     yield activitiesLogsClient.query('COMMIT');
-                    console.log('succcessfully bookmarked');
                     res.json({ message: 'Successfully bookmarked the post' });
                 }
                 else {
@@ -1246,7 +1179,6 @@ usersRoutes.patch('/bookmarkPost', (req, res) => __awaiter(void 0, void 0, void 
 }));
 usersRoutes.patch('/unbookmarkPost', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID, sender, postID, } = req.body;
-    console.log(req.body);
     try {
         const deleteBookmarkFromTableQuery2 = `
       DELETE FROM bookmarks_list.posts WHERE user_id = $1 AND post_id = $2
@@ -1258,7 +1190,6 @@ usersRoutes.patch('/unbookmarkPost', (req, res) => __awaiter(void 0, void 0, voi
                     currentID, postID
                 ]);
                 yield postsClient.query('COMMIT');
-                console.log('succcessfully unbookmarked');
                 res.json({ message: 'Successfully unbookmarked the post' });
             }
             else {
@@ -1281,7 +1212,6 @@ usersRoutes.patch('/unbookmarkPost', (req, res) => __awaiter(void 0, void 0, voi
 }));
 usersRoutes.patch('/deletePost', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { sender, postID, } = req.body;
-    console.log(req.body);
     try {
         const insertDeletePostQuery = `
       UPDATE posts_list.posts_data
@@ -1294,7 +1224,6 @@ usersRoutes.patch('/deletePost', (req, res) => __awaiter(void 0, void 0, void 0,
                 sender, postID
             ]);
             yield postsClient.query('COMMIT');
-            console.log('succcessfully deleted');
             res.json({ message: 'Successfully deleted the post' });
         }
         catch (error) {
@@ -1313,7 +1242,6 @@ usersRoutes.patch('/deletePost', (req, res) => __awaiter(void 0, void 0, void 0,
 }));
 usersRoutes.post('/uploadComment', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { commentID, content, sender, mediasDatas, parentPostID, parentPostSender, parentPostType, hashtags, taggedUsers } = req.body;
-    console.log(req.body);
     try {
         const insertCommentDataQuery = `
       INSERT INTO comments_list.comments_data (
@@ -1338,25 +1266,6 @@ usersRoutes.post('/uploadComment', (req, res) => __awaiter(void 0, void 0, void 
     `;
         //var uuidArr = new Array(1000000).fill(0).map(() => uuidv4());
         //var contentsArr = new Array(1000000).fill(0).map((e, i) => `codebase eminem ${Math.random() * 100000} elitshadye ${i}`);
-        const insertCommentDataQuery2 = `
-      INSERT INTO comments_list.comments_data (
-        comment_id, type, content, sender, upload_time, medias_datas, parent_post_type, 
-        parent_post_id, parent_post_sender, deleted
-      )
-      SELECT
-      commentid as comment_id,
-      $1 as type,
-      content as content,
-      $2 as sender,
-      $3 as upload_time,
-      $4 as medias_datas,
-      $5 as parent_post_type,
-      $6 as parent_post_id,
-      $7 as parent_post_sender,
-      $8 as deleted
-      FROM
-      unnest($9::text[], $10::text[]) as u(commentid, content)
-    `;
         try {
             if ((yield userExists(parentPostSender)) && !(yield isBlockedByUser(parentPostSender, sender))) {
                 yield postsClient.query('BEGIN');
@@ -1418,7 +1327,6 @@ usersRoutes.post('/uploadComment', (req, res) => __awaiter(void 0, void 0, void 
                     ]);
                 }
                 yield keywordsClient.query('COMMIT');
-                console.log('successful');
                 res.json({ message: 'Successfully uploaded the comment' });
             }
             else {
@@ -1441,7 +1349,6 @@ usersRoutes.post('/uploadComment', (req, res) => __awaiter(void 0, void 0, void 
 }));
 usersRoutes.patch('/likeComment', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID, sender, commentID, } = req.body;
-    console.log(req.body);
     try {
         const insertLikeCommentQuery = `
       INSERT INTO likes_list.comments (
@@ -1471,7 +1378,6 @@ usersRoutes.patch('/likeComment', (req, res) => __awaiter(void 0, void 0, void 0
                     }
                 }
                 yield activitiesLogsClient.query('COMMIT');
-                console.log('succcessfully liked');
                 res.json({ message: 'Successfully liked the comment' });
             }
             else {
@@ -1494,7 +1400,6 @@ usersRoutes.patch('/likeComment', (req, res) => __awaiter(void 0, void 0, void 0
 }));
 usersRoutes.patch('/unlikeComment', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID, sender, commentID, } = req.body;
-    console.log(req.body);
     try {
         const insertUnlikeCommentQuery = `
       DELETE FROM likes_list.comments WHERE user_id = $1 AND comment_id = $2;
@@ -1528,7 +1433,6 @@ usersRoutes.patch('/unlikeComment', (req, res) => __awaiter(void 0, void 0, void
 }));
 usersRoutes.patch('/bookmarkComment', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID, sender, commentID, } = req.body;
-    console.log(req.body);
     try {
         const insertBookmarkCommentQuery = `
       INSERT INTO bookmarks_list.comments (
@@ -1553,7 +1457,6 @@ usersRoutes.patch('/bookmarkComment', (req, res) => __awaiter(void 0, void 0, vo
         if (commentDataList.length > 0) {
             try {
                 if ((yield userExists(sender)) && !(yield isBlockedByUser(sender, currentID)) && !(yield userIsPrivateAndNotFollowedByCurrentID(sender, currentID))) {
-                    var commentData = commentDataList[0];
                     yield postsClient.query('BEGIN');
                     yield postsClient.query(insertBookmarkCommentQuery, [currentID, commentID, sender, new Date()]);
                     yield postsClient.query('COMMIT');
@@ -1566,7 +1469,6 @@ usersRoutes.patch('/bookmarkComment', (req, res) => __awaiter(void 0, void 0, vo
                         }
                     }
                     yield activitiesLogsClient.query('COMMIT');
-                    console.log('succcessfully bookmarked');
                     res.json({ message: 'Successfully bookmarked the comment' });
                 }
                 else {
@@ -1595,7 +1497,6 @@ usersRoutes.patch('/bookmarkComment', (req, res) => __awaiter(void 0, void 0, vo
 }));
 usersRoutes.patch('/unbookmarkComment', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID, sender, commentID, } = req.body;
-    console.log(req.body);
     try {
         const deleteBookmarkFromTableQuery2 = `
       DELETE FROM bookmarks_list.comments WHERE user_id = $1 AND comment_id = $2
@@ -1607,7 +1508,6 @@ usersRoutes.patch('/unbookmarkComment', (req, res) => __awaiter(void 0, void 0, 
                     currentID, commentID
                 ]);
                 yield postsClient.query('COMMIT');
-                console.log('succcessfully unbookmarked');
                 res.json({ message: 'Successfully unbookmarked the comment' });
             }
             else {
@@ -1629,8 +1529,7 @@ usersRoutes.patch('/unbookmarkComment', (req, res) => __awaiter(void 0, void 0, 
     }
 }));
 usersRoutes.patch('/deleteComment', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { sender, commentID, parentPostType, parentPostID, parentPostSender } = req.body;
-    console.log(req.body);
+    const { sender, commentID } = req.body;
     try {
         const insertDeleteCommentQuery = `
       UPDATE comments_list.comments_data
@@ -1644,7 +1543,6 @@ usersRoutes.patch('/deleteComment', (req, res) => __awaiter(void 0, void 0, void
                 commentID
             ]);
             yield postsClient.query('COMMIT');
-            console.log('succcessfully deleted');
             res.json({ message: 'Successfully deleted the comment' });
         }
         catch (error) {
@@ -1687,7 +1585,6 @@ function followUser(followedID, followingID, filterPrivate) {
                     'follow', followingID, followedID, '', '', new Date().toISOString()
                 ]);
                 yield activitiesLogsClient.query('COMMIT');
-                console.log('successfully followed');
                 return ({ message: 'Successfully followed user' });
             }
             else {
@@ -1715,7 +1612,6 @@ function sendFollowRequest(requestedID, requestingID) {
                     requestingID, requestedID, new Date()
                 ]);
                 yield profilesClient.query('COMMIT');
-                console.log('successfully requested');
                 return ({ message: 'Successfully send request to user' });
             }
             else {
@@ -1736,11 +1632,9 @@ usersRoutes.patch('/followUser', (req, res) => __awaiter(void 0, void 0, void 0,
         var message;
         yield profilesClient.query('BEGIN');
         if (followedUserBasicData.private) {
-            console.log('send follow reqiues');
             message = yield sendFollowRequest(followedID, currentID);
         }
         else {
-            console.log('follow directly');
             message = yield followUser(followedID, currentID, true);
         }
         yield profilesClient.query('COMMIT');
@@ -1764,7 +1658,6 @@ usersRoutes.patch('/unfollowUser', (req, res) => __awaiter(void 0, void 0, void 
                 currentID, followedID
             ]);
             yield profilesClient.query('COMMIT');
-            console.log('successfully followed');
             res.json({ message: 'Successfully followed user' });
         }
         catch (error) {
@@ -1783,7 +1676,6 @@ usersRoutes.patch('/unfollowUser', (req, res) => __awaiter(void 0, void 0, void 
 }));
 usersRoutes.get('/fetchUserProfileFollowers', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchUserProfileFollowersQuery = `SELECT * FROM public."fetch_user_followers"($1, $2, $3, $4)`;
         const fetchUserProfileFollowers = yield profilesClient.query(fetchUserProfileFollowersQuery, [
@@ -1812,7 +1704,6 @@ usersRoutes.get('/fetchUserProfileFollowers', (req, res) => __awaiter(void 0, vo
 }));
 usersRoutes.get('/fetchUserProfileFollowing', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchUserProfileFollowingQuery = `SELECT * FROM public."fetch_user_following"($1, $2, $3, $4)`;
         const fetchUserProfileFollowing = yield profilesClient.query(fetchUserProfileFollowingQuery, [
@@ -1842,11 +1733,9 @@ usersRoutes.get('/fetchUserProfileFollowing', (req, res) => __awaiter(void 0, vo
 usersRoutes.get('/fetchSelectedPostComments', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { sender, postID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        console.log(req.body);
         const fetchSelectedPostDataQuery = `SELECT * FROM posts_list.posts_data WHERE sender = $1 AND post_id = $2`;
         const fetchSelectedPostData = yield postsClient.query(fetchSelectedPostDataQuery, [sender, postID]);
         var selectedPostData = fetchSelectedPostData.rows[0];
-        console.log('1');
         var getCompleteUsersData = yield getUsersListCompleteData([sender], currentID);
         var usersProfileData = getCompleteUsersData.usersProfileData;
         var usersSocialsData = getCompleteUsersData.usersSocialsData;
@@ -1866,8 +1755,6 @@ usersRoutes.get('/fetchSelectedPostComments', (req, res) => __awaiter(void 0, vo
         const completePostsList = getCompletePostsData.completeDataList;
         usersProfileData.push(...getCompletePostsData.usersProfileData);
         usersSocialsData.push(...getCompletePostsData.usersSocialsData);
-        console.log('successfully fetching post data');
-        console.log(postComments.length);
         res.json({
             message: 'Successfully fetched data', usersProfileData: usersProfileData,
             usersSocialsData: usersSocialsData, commentsData: completePostsList,
@@ -1881,10 +1768,8 @@ usersRoutes.get('/fetchSelectedPostComments', (req, res) => __awaiter(void 0, vo
     }
 }));
 usersRoutes.get('/fetchSelectedPostCommentsPagination', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { sender, postID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
+    const { postID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        console.log(req.body);
-        var commentsData = [];
         const fetchPostCommentsQuery = `SELECT * FROM public."fetch_post_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
         const fetchPostComments = yield postsClient.query(fetchPostCommentsQuery, [
             postID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
@@ -1899,7 +1784,6 @@ usersRoutes.get('/fetchSelectedPostCommentsPagination', (req, res) => __awaiter(
         const completePostsList = getCompletePostsData.completeDataList;
         const usersProfileData = getCompletePostsData.usersProfileData;
         const usersSocialsData = getCompletePostsData.usersSocialsData;
-        console.log('successfully fetching post data pagination');
         res.json({
             message: 'Successfully fetched data', usersProfileData: usersProfileData,
             usersSocialsData: usersSocialsData, commentsData: completePostsList,
@@ -1915,7 +1799,6 @@ usersRoutes.get('/fetchSelectedPostCommentsPagination', (req, res) => __awaiter(
 usersRoutes.get('/fetchSelectedCommentComments', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { sender, commentID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        console.log(req.body);
         const fetchSelectedCommentDataQuery = `SELECT * FROM comments_list.comments_data WHERE sender = $1 AND comment_id = $2`;
         const fetchSelectedCommentData = yield postsClient.query(fetchSelectedCommentDataQuery, [sender, commentID]);
         var selectedCommentData = fetchSelectedCommentData.rows[0];
@@ -1927,7 +1810,6 @@ usersRoutes.get('/fetchSelectedCommentComments', (req, res) => __awaiter(void 0,
         var getCompleteUsersData = yield getUsersListCompleteData([parentPostSender, sender], currentID);
         const usersProfileData = getCompleteUsersData.usersProfileData;
         const usersSocialsData = getCompleteUsersData.usersSocialsData;
-        console.log(selectedCommentData);
         const fetchParentPostDataQuery = parentPostType == 'post' ?
             `SELECT * FROM posts_list.posts_data WHERE sender = $1 AND post_id = $2`
             :
@@ -1939,7 +1821,6 @@ usersRoutes.get('/fetchSelectedCommentComments', (req, res) => __awaiter(void 0,
             :
                 yield getCommentEngagementsData(parentPostData.comment_id, parentPostData.sender, currentID);
         parentPostData = Object.assign(Object.assign({}, parentPostData), parentPostEngagementsData);
-        console.log('DSHDDJDD');
         const fetchCommentCommentsQuery = `SELECT * FROM public."fetch_comment_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
         const fetchCommentComments = yield postsClient.query(fetchCommentCommentsQuery, [
             commentID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
@@ -1954,7 +1835,6 @@ usersRoutes.get('/fetchSelectedCommentComments', (req, res) => __awaiter(void 0,
         const completePostsList = getCompletePostsData.completeDataList;
         usersProfileData.push(...getCompletePostsData.usersProfileData);
         usersSocialsData.push(...getCompletePostsData.usersSocialsData);
-        console.log('successfully fetching comment data');
         res.json({
             message: 'Successfully fetched data', usersProfileData: usersProfileData,
             usersSocialsData: usersSocialsData, commentsData: completePostsList,
@@ -1969,9 +1849,8 @@ usersRoutes.get('/fetchSelectedCommentComments', (req, res) => __awaiter(void 0,
     }
 }));
 usersRoutes.get('/fetchSelectedCommentCommentsPagination', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { sender, commentID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
+    const { commentID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        var commentsData = [];
         const fetchCommentCommentsQuery = `SELECT * FROM public."fetch_comment_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
         const fetchCommentComments = yield postsClient.query(fetchCommentCommentsQuery, [
             commentID, currentID, currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
@@ -1986,8 +1865,6 @@ usersRoutes.get('/fetchSelectedCommentCommentsPagination', (req, res) => __await
         const completePostsList = getCompletePostsData.completeDataList;
         const usersProfileData = getCompletePostsData.usersProfileData;
         const usersSocialsData = getCompletePostsData.usersSocialsData;
-        console.log('successfully fetching comment data');
-        console.log(commentsData);
         res.json({
             message: 'Successfully fetched data', usersProfileData: usersProfileData,
             usersSocialsData: usersSocialsData, commentsData: completePostsList,
@@ -2002,7 +1879,6 @@ usersRoutes.get('/fetchSelectedCommentCommentsPagination', (req, res) => __await
 }));
 usersRoutes.get('/fetchSearchedPosts', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { searchedText, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchSearchedPostsDataQuery = `SELECT * FROM public."fetch_searched_posts"($1, $2, $3, $4, $5, $6, $7, $8)`;
         const fetchSearchedPostsData = yield postsClient.query(fetchSearchedPostsDataQuery, [
@@ -2010,17 +1886,14 @@ usersRoutes.get('/fetchSearchedPosts', (req, res) => __awaiter(void 0, void 0, v
             username, IP, PORT, password
         ]);
         const searchedPosts = fetchSearchedPostsData.rows.map((e) => e.post_data);
-        //console.log(searchedPosts);
+        //
         const totalPostsLength = Math.min(maxFetchLimit, searchedPosts.length);
-        console.log(totalPostsLength);
         var modifiedSearchedPosts = [...searchedPosts];
         modifiedSearchedPosts = modifiedSearchedPosts.slice(currentLength, currentLength + Math.min(searchedPosts.length - currentLength, paginationLimit));
         var getCompletePostsData = yield getPostsListFilteredData(modifiedSearchedPosts, currentID);
         const completePostsList = getCompletePostsData.completeDataList;
         const usersProfileData = getCompletePostsData.usersProfileData;
         const usersSocialsData = getCompletePostsData.usersSocialsData;
-        console.log(searchedPosts.length);
-        console.log('successfully fetched searched posts');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -2037,16 +1910,13 @@ usersRoutes.get('/fetchSearchedPosts', (req, res) => __awaiter(void 0, void 0, v
     }
 }));
 usersRoutes.get('/fetchSearchedPostsPagination', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var { searchedText, searchedPostsEncoded, currentID, currentLength, paginationLimit } = req.body;
+    var { searchedPostsEncoded, currentID } = req.body;
     try {
         var modifiedSearchedPosts = JSON.parse(searchedPostsEncoded);
-        console.log(modifiedSearchedPosts.length);
         var getCompletePostsData = yield getPostsListFilteredData(modifiedSearchedPosts, currentID);
         const completePostsList = getCompletePostsData.completeDataList;
         const usersProfileData = getCompletePostsData.usersProfileData;
         const usersSocialsData = getCompletePostsData.usersSocialsData;
-        console.log(completePostsList.length);
-        console.log('successfully fetched searched pagination');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -2062,7 +1932,6 @@ usersRoutes.get('/fetchSearchedPostsPagination', (req, res) => __awaiter(void 0,
 }));
 usersRoutes.get('/fetchSearchedComments', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { searchedText, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchSearchedCommentsDataQuery = `SELECT * FROM public."fetch_searched_comments"($1, $2, $3, $4, $5, $6, $7, $8)`;
         const fetchSearchedCommentsData = yield postsClient.query(fetchSearchedCommentsDataQuery, [
@@ -2071,15 +1940,12 @@ usersRoutes.get('/fetchSearchedComments', (req, res) => __awaiter(void 0, void 0
         ]);
         const searchedComments = fetchSearchedCommentsData.rows.map((e) => e.post_data);
         const totalCommentsLength = Math.min(maxFetchLimit, searchedComments.length);
-        console.log(totalCommentsLength);
         var modifiedSearchedComments = [...searchedComments];
         modifiedSearchedComments = modifiedSearchedComments.slice(currentLength, currentLength + Math.min(searchedComments.length - currentLength, paginationLimit));
         var getCompletePostsData = yield getPostsListFilteredData(modifiedSearchedComments, currentID);
         const completePostsList = getCompletePostsData.completeDataList;
         const usersProfileData = getCompletePostsData.usersProfileData;
         const usersSocialsData = getCompletePostsData.usersSocialsData;
-        console.log(searchedComments.length);
-        console.log('successfully fetched searched comments');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -2096,15 +1962,13 @@ usersRoutes.get('/fetchSearchedComments', (req, res) => __awaiter(void 0, void 0
     }
 }));
 usersRoutes.get('/fetchSearchedCommentsPagination', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var { searchedText, searchedCommentsEncoded, currentID, currentLength, paginationLimit } = req.body;
+    var { searchedCommentsEncoded, currentID } = req.body;
     try {
         var modifiedSearchedComments = JSON.parse(searchedCommentsEncoded);
         var getCompletePostsData = yield getPostsListFilteredData(modifiedSearchedComments, currentID);
         const completePostsList = getCompletePostsData.completeDataList;
         const usersProfileData = getCompletePostsData.usersProfileData;
         const usersSocialsData = getCompletePostsData.usersSocialsData;
-        console.log(modifiedSearchedComments.length);
-        console.log('successfully fetched searched pagination');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -2120,9 +1984,8 @@ usersRoutes.get('/fetchSearchedCommentsPagination', (req, res) => __awaiter(void
 }));
 usersRoutes.get('/fetchSearchedUsers', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { searchedText, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
-        const fetchSearchedUsersDataQuery = `SELECT user_id FROM basic_data.user_profile WHERE name LIKE '%${searchedText}%' OR username LIKE '%${searchedText}%'`;
+        const fetchSearchedUsersDataQuery = `SELECT user_id FROM basic_data.user_profile WHERE lower(name) LIKE '%lower(${searchedText})%' OR username LIKE '%lower(${searchedText})%'`;
         const fetchSearchedUsersData = yield profilesClient.query(fetchSearchedUsersDataQuery, []);
         var searchedUsersData = fetchSearchedUsersData.rows.map((e) => e.user_id);
         const totalUsersLength = searchedUsersData.length;
@@ -2133,7 +1996,6 @@ usersRoutes.get('/fetchSearchedUsers', (req, res) => __awaiter(void 0, void 0, v
         var getCompleteUsersData = yield getUsersListCompleteData(modifiedSearchedUsers, currentID);
         const usersProfileData = getCompleteUsersData.usersProfileData;
         const usersSocialsData = getCompleteUsersData.usersSocialsData;
-        console.log('successfully fetched searched users');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -2149,13 +2011,12 @@ usersRoutes.get('/fetchSearchedUsers', (req, res) => __awaiter(void 0, void 0, v
     }
 }));
 usersRoutes.get('/fetchSearchedUsersPagination', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var { searchedText, currentID, searchedUsersEncoded, } = req.body;
+    var { currentID, searchedUsersEncoded, } = req.body;
     try {
         var modifiedSearchedUsers = JSON.parse(searchedUsersEncoded);
         var getCompleteUsersData = yield getUsersListCompleteData(modifiedSearchedUsers, currentID);
         const usersProfileData = getCompleteUsersData.usersProfileData;
         const usersSocialsData = getCompleteUsersData.usersSocialsData;
-        console.log('successfully fetched searched paginate users');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -2231,8 +2092,6 @@ usersRoutes.get('/fetchUserNotifications', (req, res) => __awaiter(void 0, void 
                 const fetchPostDataQuery = `SELECT * FROM posts_list.posts_data WHERE sender = $1 AND post_id = $2`;
                 const fetchPostData = yield postsClient.query(fetchPostDataQuery, [currentID, notificationData.referenced_post_id]);
                 const postData = fetchPostData.rows[0];
-                console.log(notificationData);
-                console.log(postData);
                 extraData.content = postData.content;
                 extraData.medias_datas = postData.medias_datas;
                 extraData.post_deleted = postData.deleted;
@@ -2270,7 +2129,6 @@ usersRoutes.get('/fetchPostLikes', (req, res) => __awaiter(void 0, void 0, void 
             Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit + 1)),
             username, IP, PORT, password
         ]);
-        console.log(fetchPostLikesData.rows);
         const postLikesData = fetchPostLikesData.rows.map((e) => e.user_id);
         const dataLength = postLikesData.length;
         if (dataLength > paginationLimit) {
@@ -2390,7 +2248,6 @@ usersRoutes.get('/fetchCommentBookmarks', (req, res) => __awaiter(void 0, void 0
 }));
 usersRoutes.get('/fetchSearchedTagUsers', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { searchedText, currentID, currentLength, paginationLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchSearchedUsersDataQuery = `SELECT user_id FROM public."fetch_searched_tag_users" ($1, $2, $3, $4)`;
         const fetchSearchedUsersData = yield profilesClient.query(fetchSearchedUsersDataQuery, [
@@ -2399,7 +2256,6 @@ usersRoutes.get('/fetchSearchedTagUsers', (req, res) => __awaiter(void 0, void 0
         var searchedUsersData = fetchSearchedUsersData.rows.map((e) => e.user_id);
         var getCompleteUsersData = yield getUsersListBasicData(searchedUsersData, currentID);
         const usersProfileData = getCompleteUsersData.usersProfileData.map((e) => e.data.basic_data);
-        console.log('successfully fetched searched users');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -2413,7 +2269,6 @@ usersRoutes.get('/fetchSearchedTagUsers', (req, res) => __awaiter(void 0, void 0
 }));
 usersRoutes.get('/fetchTopHashtags', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { paginationLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchHashtagsDataQuery = `SELECT * FROM hashtags.hashtags_list ORDER BY hashtag_count DESC OFFSET $1 LIMIT $2`;
         const fetchHashtagsData = yield keywordsClient.query(fetchHashtagsDataQuery, [0, paginationLimit]);
@@ -2444,7 +2299,6 @@ usersRoutes.patch('/muteUser', (req, res) => __awaiter(void 0, void 0, void 0, f
                     userID
                 ]);
                 yield profilesClient.query('COMMIT');
-                console.log('successfully muted');
                 res.json({ message: 'Successfully muted user' });
             }
             else {
@@ -2477,7 +2331,6 @@ usersRoutes.patch('/unmuteUser', (req, res) => __awaiter(void 0, void 0, void 0,
                     userID
                 ]);
                 yield profilesClient.query('COMMIT');
-                console.log('successfully unmuted');
                 res.json({ message: 'Successfully unmuted user' });
             }
             else {
@@ -2516,7 +2369,6 @@ usersRoutes.patch('/blockUser', (req, res) => __awaiter(void 0, void 0, void 0, 
                 yield profilesClient.query(deleteFollowRequestsHistory, [currentID, userID]);
                 yield profilesClient.query(deleteFollowRequestsHistory, [userID, currentID]);
                 yield profilesClient.query('COMMIT');
-                console.log('successfully blocked');
                 res.json({ message: 'Successfully blocked user' });
             }
             else {
@@ -2549,7 +2401,6 @@ usersRoutes.patch('/unblockUser', (req, res) => __awaiter(void 0, void 0, void 0
                     userID
                 ]);
                 yield profilesClient.query('COMMIT');
-                console.log('successfully unblocked');
                 res.json({ message: 'Successfully unblocked user' });
             }
             else {
@@ -2584,7 +2435,6 @@ usersRoutes.patch('/lockAccount', (req, res) => __awaiter(void 0, void 0, void 0
                 currentID, true
             ]);
             yield profilesClient.query('COMMIT');
-            console.log('successfully locked');
             res.json({ message: 'Successfully locked user' });
         }
         catch (error) {
@@ -2603,7 +2453,6 @@ usersRoutes.patch('/lockAccount', (req, res) => __awaiter(void 0, void 0, void 0
 }));
 usersRoutes.patch('/unlockAccount', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID } = req.body;
-    console.log(req.body);
     try {
         const insertUserPrivateQuery = `
       UPDATE basic_data.user_profile
@@ -2626,13 +2475,11 @@ usersRoutes.patch('/unlockAccount', (req, res) => __awaiter(void 0, void 0, void
             ]);
             for (var i = 0; i < allRequestsToCurrentID.length; i++) {
                 var userID = allRequestsToCurrentID[i];
-                console.log(userID);
                 const removeCurrentIDFromRequestFromQuery = `DELETE FROM follow_requests_users.follow_request_history WHERE requesting_id = $1 AND requested_id = $2`;
                 yield profilesClient.query(removeCurrentIDFromRequestFromQuery, [userID, currentID]);
                 followUser(currentID, userID, false);
             }
             yield profilesClient.query('COMMIT');
-            console.log('successfully unlocked');
             res.json({ message: 'Successfully unlocked user' });
         }
         catch (error) {
@@ -2660,7 +2507,6 @@ usersRoutes.patch('/cancelFollowRequest', (req, res) => __awaiter(void 0, void 0
                     currentID, userID
                 ]);
                 yield profilesClient.query('COMMIT');
-                console.log('successfully cancelled');
                 res.json({ message: 'Successfully cancelled user' });
             }
             else {
@@ -2692,7 +2538,6 @@ usersRoutes.patch('/rejectFollowRequest', (req, res) => __awaiter(void 0, void 0
                     userID, currentID
                 ]);
                 yield profilesClient.query('COMMIT');
-                console.log('successfully rejectled');
                 res.json({ message: 'Successfully rejectled user' });
             }
             else {
@@ -2725,7 +2570,6 @@ usersRoutes.patch('/acceptFollowRequest', (req, res) => __awaiter(void 0, void 0
                 ]);
                 followUser(currentID, userID, false);
                 yield profilesClient.query('COMMIT');
-                console.log('successfully accepted');
                 res.json({ message: 'Successfully accepted user' });
             }
             else {
@@ -2748,7 +2592,6 @@ usersRoutes.patch('/acceptFollowRequest', (req, res) => __awaiter(void 0, void 0
 }));
 usersRoutes.get('/fetchFollowRequestsFromUser', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchUserProfileFollowRequestsFromQuery = `SELECT * FROM public."fetch_follow_requests_from"($1, $2, $3)`;
         const fetchUserProfileFollowRequestsFrom = yield profilesClient.query(fetchUserProfileFollowRequestsFromQuery, [
@@ -2781,7 +2624,6 @@ usersRoutes.get('/fetchFollowRequestsFromUser', (req, res) => __awaiter(void 0, 
 }));
 usersRoutes.get('/fetchFollowRequestsToUser', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchUserProfilefollowRequestsToQuery = `SELECT * FROM public."fetch_follow_requests_to"($1, $2, $3)`;
         const fetchUserProfilefollowRequestsTo = yield profilesClient.query(fetchUserProfilefollowRequestsToQuery, [
@@ -2856,7 +2698,6 @@ usersRoutes.get('/fetchUserChats', (req, res) => __awaiter(void 0, void 0, void 
         LIMIT 1
       `;
             const fetchLatestMessageData = yield chatsClient.query(fetchLatestMessageDataQuery, [chatID, userID]);
-            console.log(fetchLatestMessageData.rows);
             if (fetchLatestMessageData.rowCount > 0) {
                 const latestMessageData = fetchLatestMessageData.rows[0];
                 chatsData[i].latest_message_upload_time = latestMessageData.upload_time;
@@ -2883,7 +2724,6 @@ usersRoutes.get('/fetchUserChats', (req, res) => __awaiter(void 0, void 0, void 
             const fetchLatestMessageData = yield chatsClient.query(fetchLatestMessageDataQuery, [chatID, userID]);
             if (fetchLatestMessageData.rowCount > 0) {
                 const latestMessageData = fetchLatestMessageData.rows[0];
-                console.log(latestMessageData);
                 chatsData[i].latest_message_upload_time = latestMessageData.upload_time;
                 chatsData[i].latest_message_id = latestMessageData.message_id;
                 chatsData[i].latest_message_content = latestMessageData.content;
@@ -2923,7 +2763,6 @@ usersRoutes.get('/fetchUserChats', (req, res) => __awaiter(void 0, void 0, void 
             chatsData[i].members = groupProfileData.members;
         }
     }
-    console.log(chatsData);
     res.json({
         message: 'Successfully fetched data',
         userChatsData: chatsData,
@@ -2946,7 +2785,6 @@ usersRoutes.get('/fetchPrivateChat', (req, res) => __awaiter(void 0, void 0, voi
                 currentCompleteData.data.socials_data, recipientCompleteData.data.socials_data
             ];
             if (chatID == null) {
-                console.log('chat id null');
                 const fetchChatDataQuery = `
           SELECT * FROM users_chats.chats_history
           WHERE user_id = $1 AND recipient = $2
@@ -2955,7 +2793,6 @@ usersRoutes.get('/fetchPrivateChat', (req, res) => __awaiter(void 0, void 0, voi
                     currentID, recipient
                 ]);
                 const chatData = fetchChatData.rows[0];
-                console.log(fetchChatData);
                 if (chatData == undefined) {
                     res.json({
                         'message': 'Chat history not found',
@@ -2971,7 +2808,6 @@ usersRoutes.get('/fetchPrivateChat', (req, res) => __awaiter(void 0, void 0, voi
                 }
             }
             if (chatID != null || chatID != undefined) {
-                console.log('chat id not null $chatID');
                 const fetchPrivateChatDataQuery = `
           SELECT * FROM private_messages.messages_history
           WHERE chat_id = $1 AND NOT $2 = ANY(deleted_list)
@@ -3057,7 +2893,6 @@ usersRoutes.get('/fetchPrivateChatPagination', (req, res) => __awaiter(void 0, v
 usersRoutes.post('/sendPrivateMessage', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { chatID, newChatID, messageID, content, sender, recipient, mediasDatas, } = req.body;
     try {
-        console.log(req.body);
         if ((yield userExists(recipient)) && !(yield isBlockedByUser(sender, recipient)) && !(yield isBlockedByUser(recipient, sender))) {
             if (chatID == null) {
                 const insertCurrentUserChatTableQuery = `
@@ -3153,7 +2988,7 @@ usersRoutes.patch('/deletePrivateChat', (req, res) => __awaiter(void 0, void 0, 
     }
 }));
 usersRoutes.patch('/deletePrivateMessage', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { chatID, messageID, currentID } = req.body;
+    const { messageID, currentID } = req.body;
     try {
         const deleteMessageQuery = `
       UPDATE private_messages.messages_history
@@ -3172,7 +3007,7 @@ usersRoutes.patch('/deletePrivateMessage', (req, res) => __awaiter(void 0, void 
     }
 }));
 usersRoutes.patch('/deletePrivateMessageForAll', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { chatID, messageID, currentID, recipient } = req.body;
+    const { messageID, currentID, recipient } = req.body;
     try {
         var members = [currentID, recipient];
         const deleteMessageQuery = `
@@ -3193,18 +3028,14 @@ usersRoutes.patch('/deletePrivateMessageForAll', (req, res) => __awaiter(void 0,
 }));
 usersRoutes.get('/fetchSearchedChatUsers', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { searchedText, currentID, currentLength, paginationLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchSearchedUsersDataQuery = `SELECT user_id FROM public."fetch_searched_chat_users" ($1, $2, $3, $4)`;
         const fetchSearchedUsersData = yield profilesClient.query(fetchSearchedUsersDataQuery, [
             searchedText, currentID, currentLength, paginationLimit
         ]);
         var searchedUsersData = fetchSearchedUsersData.rows.map((e) => e.user_id);
-        console.log(searchedUsersData);
         var getCompleteUsersData = yield getUsersListBasicData(searchedUsersData, currentID);
         const usersProfileData = getCompleteUsersData.usersProfileData.map((e) => e.data.basic_data);
-        console.log(usersProfileData);
-        console.log('successfully fetched searched users');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -3219,7 +3050,6 @@ usersRoutes.get('/fetchSearchedChatUsers', (req, res) => __awaiter(void 0, void 
 usersRoutes.get('/fetchGroupChat', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var { chatID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        console.log('chat id not null $chatID');
         var membersProfileData = [];
         var membersSocialsData = [];
         var membersIDs = [];
@@ -3292,7 +3122,6 @@ usersRoutes.get('/fetchGroupChat', (req, res) => __awaiter(void 0, void 0, void 
 usersRoutes.get('/fetchGroupChatPagination', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var { chatID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        console.log('chat id not null $chatID');
         var membersProfileData = [];
         var membersSocialsData = [];
         var membersIDs = [];
@@ -3442,7 +3271,7 @@ usersRoutes.patch('/deleteGroupChat', (req, res) => __awaiter(void 0, void 0, vo
     }
 }));
 usersRoutes.patch('/deleteGroupMessage', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { chatID, messageID, currentID } = req.body;
+    const { messageID, currentID } = req.body;
     try {
         const deleteMessageQuery = `
       UPDATE group_messages.messages_history
@@ -3461,9 +3290,8 @@ usersRoutes.patch('/deleteGroupMessage', (req, res) => __awaiter(void 0, void 0,
     }
 }));
 usersRoutes.patch('/deleteGroupMessageForAll', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { chatID, messageID, currentID, recipients } = req.body;
+    const { messageID, currentID, recipients } = req.body;
     try {
-        console.log(recipients);
         recipients.push(currentID);
         const deleteMessageQuery = `
       UPDATE group_messages.messages_history
@@ -3484,7 +3312,6 @@ usersRoutes.patch('/deleteGroupMessageForAll', (req, res) => __awaiter(void 0, v
 usersRoutes.patch('/editGroupProfileData', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { chatID, messageID, sender, recipients, newData } = req.body;
     try {
-        console.log(req.body);
         var name = newData.name;
         var profilePicLink = newData.profilePicLink;
         var description = newData.description;
@@ -3528,7 +3355,6 @@ usersRoutes.patch('/editGroupProfileData', (req, res) => __awaiter(void 0, void 
 usersRoutes.patch('/leaveGroup', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { chatID, messageID, sender, recipients, } = req.body;
     try {
-        console.log(req.body);
         const insertCurrentUserChatQuery = `
       INSERT INTO group_messages.messages_history(
         chat_id, message_id, type, content, sender, upload_time, medias_datas, deleted_list
@@ -3572,7 +3398,6 @@ usersRoutes.patch('/leaveGroup', (req, res) => __awaiter(void 0, void 0, void 0,
 }));
 usersRoutes.get('/fetchSearchedAddToGroupUsers', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { searchedText, recipients, currentID, currentLength, paginationLimit } = req.body;
-    console.log(req.body);
     try {
         const fetchSearchedUsersDataQuery = `SELECT user_id FROM public."fetch_searched_add_to_group_users" ($1, $2, $3, $4, $5)`;
         const fetchSearchedUsersData = yield profilesClient.query(fetchSearchedUsersDataQuery, [
@@ -3581,7 +3406,6 @@ usersRoutes.get('/fetchSearchedAddToGroupUsers', (req, res) => __awaiter(void 0,
         var searchedUsersData = fetchSearchedUsersData.rows.map((e) => e.user_id);
         var getCompleteUsersData = yield getUsersListBasicData(searchedUsersData, currentID);
         const usersProfileData = getCompleteUsersData.usersProfileData.map((e) => e.data.basic_data);
-        console.log('successfully fetched searched users');
         res.json({
             'message': "Successfully fetched data",
             'usersProfileData': usersProfileData,
@@ -3596,7 +3420,6 @@ usersRoutes.get('/fetchSearchedAddToGroupUsers', (req, res) => __awaiter(void 0,
 usersRoutes.patch('/addUsersToGroup', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { chatID, messagesID, sender, recipients, addedUsersID } = req.body;
     try {
-        console.log(req.body);
         const deleteAllMessageQuery = `
       UPDATE group_messages.messages_history
       SET deleted_list = array_cat(deleted_list, $1)
@@ -3604,7 +3427,6 @@ usersRoutes.patch('/addUsersToGroup', (req, res) => __awaiter(void 0, void 0, vo
     `;
         yield chatsClient.query(deleteAllMessageQuery, [addedUsersID, chatID]);
         var typesArr = addedUsersID.map((e) => `add_users_to_group_${e}`);
-        console.log(messagesID);
         const insertCurrentUserChatQuery = `
       INSERT INTO group_messages.messages_history(
         chat_id, message_id, type, content, sender, upload_time, medias_datas, deleted_list
@@ -3662,7 +3484,6 @@ usersRoutes.patch('/addUsersToGroup', (req, res) => __awaiter(void 0, void 0, vo
 }));
 usersRoutes.get('/fetchGroupMembersData', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var { usersID, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
-    console.log(req.body);
     try {
         usersID = usersID.slice(currentLength, Math.max(0, Math.min(maxFetchLimit - currentLength, paginationLimit)));
         var getCompleteUsersData = yield getUsersListFilteredData(usersID, currentID);
@@ -3680,7 +3501,6 @@ usersRoutes.get('/fetchGroupMembersData', (req, res) => __awaiter(void 0, void 0
 }));
 usersRoutes.patch('/editPost', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { postId, content, sender, mediasDatas, hashtags, taggedUsers, } = req.body;
-    console.log(req.body);
     try {
         const fetchPostDataQuery = `
       SELECT * FROM posts_list.posts_data WHERE post_id = $1 AND sender = $2
@@ -3736,9 +3556,7 @@ usersRoutes.patch('/editPost', (req, res) => __awaiter(void 0, void 0, void 0, f
                     ]);
                 }
                 yield keywordsClient.query('COMMIT');
-                console.log('successful');
                 res.json({ message: 'Successfully edited the post' });
-                console.log('User data inserted successfully');
             }
             catch (error) {
                 // Rollback the transaction if any error occurs
@@ -3756,8 +3574,7 @@ usersRoutes.patch('/editPost', (req, res) => __awaiter(void 0, void 0, void 0, f
     }
 }));
 usersRoutes.patch('/editComment', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { commentID, content, sender, mediasDatas, parentPostID, parentPostSender, parentPostType, hashtags, taggedUsers } = req.body;
-    console.log(req.body);
+    const { commentID, content, sender, mediasDatas, parentPostSender, hashtags, taggedUsers } = req.body;
     try {
         const insertCommentDataQuery = `
       UPDATE comments_list.comments_data
@@ -3808,7 +3625,6 @@ usersRoutes.patch('/editComment', (req, res) => __awaiter(void 0, void 0, void 0
                     ]);
                 }
                 yield keywordsClient.query('COMMIT');
-                console.log('successful');
                 res.json({ message: 'Successfully edited the comment' });
             }
             else {
@@ -3843,7 +3659,6 @@ usersRoutes.patch('/deleteAccount', (req, res) => __awaiter(void 0, void 0, void
                 currentID, true
             ]);
             yield profilesClient.query('COMMIT');
-            console.log('successfully deleted');
             res.json({ message: 'Successfully deleted user' });
         }
         catch (error) {
@@ -3880,7 +3695,6 @@ usersRoutes.delete('/hardDeleteAccount', (req, res) => __awaiter(void 0, void 0,
     const getAllCommentsQuery = `SELECT * FROM comments_list.comments_data WHERE sender = $1`;
     const getAllComments = yield postsClient.query(getAllCommentsQuery, [currentID]);
     const allComments = getAllComments.rows;
-    console.log('1');
     for (var i = 0; i < allPosts.length; i++) {
         if (allPosts[i].type == 'post') {
             var postData = allPosts[i];
@@ -3903,7 +3717,6 @@ usersRoutes.delete('/hardDeleteAccount', (req, res) => __awaiter(void 0, void 0,
             }
         }
     }
-    console.log('2');
     for (var i = 0; i < allComments.length; i++) {
         var commentData = allComments[i];
         var commentID = commentData.comment_id;
@@ -3914,12 +3727,10 @@ usersRoutes.delete('/hardDeleteAccount', (req, res) => __awaiter(void 0, void 0,
             yield postsClient.query(deleteEngagementsDataQuery, []);
         }
     }
-    console.log('3');
     const deletePostsSchemaQuery = `
     DROP SCHEMA IF EXISTS "${currentID}" CASCADE;
   `;
     yield postsClient.query(deletePostsSchemaQuery, []);
-    console.log('4');
     for (var i = 0; i < usersSchemasList.length; i++) {
         const deleteUsersDataQuery = `
       DROP TABLE IF EXISTS "${usersSchemasList[i]}"."${currentID}";
@@ -3932,12 +3743,10 @@ usersRoutes.delete('/hardDeleteAccount', (req, res) => __awaiter(void 0, void 0,
     `;
         yield activitiesLogsClient.query(deleteActivitiesLogsDataQuery, []);
     }
-    console.log('5');
     const deleteUsersDataQuery = `
     DELETE FROM basic_data.user_profile WHERE user_id = $1;
   `;
     yield profilesClient.query(deleteUsersDataQuery, [currentID]);
-    console.log('6');
     const deleteUsersPasswordQuery = `
     DELETE FROM sensitive_data.user_password WHERE user_id = $1;
   `;

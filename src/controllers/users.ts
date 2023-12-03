@@ -2408,7 +2408,7 @@ usersRoutes.get('/fetchSearchedUsers', async (req, res) => {
   } = req.body;
   
   try{
-    const fetchSearchedUsersDataQuery = `SELECT user_id FROM basic_data.user_profile WHERE name LIKE '%${searchedText}%' OR username LIKE '%${searchedText}%'`;
+    const fetchSearchedUsersDataQuery = `SELECT user_id FROM basic_data.user_profile WHERE lower(name) LIKE '%lower(${searchedText})%' OR username LIKE '%lower(${searchedText})%'`;
     const fetchSearchedUsersData = await profilesClient.query(fetchSearchedUsersDataQuery, []);
     var searchedUsersData : String[] = fetchSearchedUsersData.rows.map((e) => e.user_id);
     const totalUsersLength = searchedUsersData.length;
