@@ -131,4 +131,3 @@ app.use('/users', usersRoutes);
 
 
 httpServer.listen(port, () => console.log(`Server running on port: http://localhost:${port}`));
-

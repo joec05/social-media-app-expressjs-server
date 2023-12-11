@@ -2280,8 +2280,20 @@ usersRoutes.get('/fetchTopData', (req, res) => __awaiter(void 0, void 0, void 0,
         const fetchTopUsers = yield profilesClient.query(fetchTopUsersQuery, [currentID, paginationLimit]);
         const usersID = fetchTopUsers.rows.map((e) => e.user_id);
         var getCompleteUsersData = yield getUsersListFilteredData(usersID, currentID);
-        const usersProfileData = [...new Set([...getCompleteUsersData.usersProfileData, ...getCompletePostsData.usersProfileData])];
-        const usersSocialsData = [...new Set([...getCompleteUsersData.usersSocialsData, ...getCompletePostsData.usersSocialsData])];
+        var combinedUsersID = [];
+        var combinedUsersProfileData = [...getCompleteUsersData.usersProfileData, ...getCompletePostsData.usersProfileData];
+        var combinedUsersSocialsData = [...getCompleteUsersData.usersSocialsData, ...getCompletePostsData.usersSocialsData];
+        var filteredUsersProfileData = [];
+        var filteredUsersSocialsData = [];
+        for (var i = 0; i < combinedUsersProfileData.length; i++) {
+            if (!combinedUsersID.includes(combinedUsersProfileData[i].user_id)) {
+                combinedUsersID.push(combinedUsersProfileData[i].user_id);
+                filteredUsersProfileData.push(combinedUsersProfileData[i]);
+                filteredUsersSocialsData.push(combinedUsersSocialsData[i]);
+            }
+        }
+        const usersProfileData = filteredUsersProfileData;
+        const usersSocialsData = filteredUsersSocialsData;
         const fetchHashtagsDataQuery = `SELECT * FROM hashtags.hashtags_list ORDER BY hashtag_count DESC OFFSET $1 LIMIT $2`;
         const fetchHashtagsData = yield keywordsClient.query(fetchHashtagsDataQuery, [0, paginationLimit]);
         const hashtagsData = fetchHashtagsData.rows;
