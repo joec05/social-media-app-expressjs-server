@@ -979,8 +979,6 @@ usersRoutes.get('/fetchFeed', (req, res) => __awaiter(void 0, void 0, void 0, fu
         const fetchFollowingData = yield postsClient.query(fetchFollowingDataQuery, [
             userID, 0, maxFetchLimit, username, IP, PORT, password
         ]);
-        for (var i = 0; i < 50; i++) {
-        }
         const feedPosts = fetchFollowingData.rows.map((e) => e.post_data);
         const totalPostsLength = Math.min(maxFetchLimit, feedPosts.length);
         var modifiedFeedPosts = [...feedPosts];
@@ -1985,7 +1983,7 @@ usersRoutes.get('/fetchSearchedCommentsPagination', (req, res) => __awaiter(void
 usersRoutes.get('/fetchSearchedUsers', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { searchedText, currentID, currentLength, paginationLimit, maxFetchLimit } = req.body;
     try {
-        const fetchSearchedUsersDataQuery = `SELECT user_id FROM basic_data.user_profile WHERE lower(name) LIKE '%lower(${searchedText})%' OR username LIKE '%lower(${searchedText})%'`;
+        const fetchSearchedUsersDataQuery = `SELECT user_id FROM basic_data.user_profile WHERE name LIKE '%${searchedText}%' OR username LIKE '%${searchedText}%'`;
         const fetchSearchedUsersData = yield profilesClient.query(fetchSearchedUsersDataQuery, []);
         var searchedUsersData = fetchSearchedUsersData.rows.map((e) => e.user_id);
         const totalUsersLength = searchedUsersData.length;
@@ -2267,15 +2265,32 @@ usersRoutes.get('/fetchSearchedTagUsers', (req, res) => __awaiter(void 0, void 0
         return res.json({ message: 'Internal Server Error' });
     }
 }));
-usersRoutes.get('/fetchTopHashtags', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { paginationLimit } = req.body;
+usersRoutes.get('/fetchTopData', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { currentID, paginationLimit } = req.body;
     try {
+        const fetchTopPostsQuery = `SELECT * FROM public."fetch_most_popular_posts"($1, $2, $3, $4, $5, $6)`;
+        const fetchTopPosts = yield postsClient.query(fetchTopPostsQuery, [
+            currentID, paginationLimit,
+            username, IP, PORT, password
+        ]);
+        const postsList = fetchTopPosts.rows.map((e) => e.post_data);
+        var getCompletePostsData = yield getPostsListFilteredData(postsList, currentID);
+        const completePostsList = getCompletePostsData.completeDataList;
+        const fetchTopUsersQuery = `SELECT * FROM public."fetch_most_popular_users"($1, $2)`;
+        const fetchTopUsers = yield profilesClient.query(fetchTopUsersQuery, [currentID, paginationLimit]);
+        const usersID = fetchTopUsers.rows.map((e) => e.user_id);
+        var getCompleteUsersData = yield getUsersListFilteredData(usersID, currentID);
+        const usersProfileData = [...new Set([...getCompleteUsersData.usersProfileData, ...getCompletePostsData.usersProfileData])];
+        const usersSocialsData = [...new Set([...getCompleteUsersData.usersSocialsData, ...getCompletePostsData.usersSocialsData])];
         const fetchHashtagsDataQuery = `SELECT * FROM hashtags.hashtags_list ORDER BY hashtag_count DESC OFFSET $1 LIMIT $2`;
         const fetchHashtagsData = yield keywordsClient.query(fetchHashtagsDataQuery, [0, paginationLimit]);
         const hashtagsData = fetchHashtagsData.rows;
         res.json({
             'message': "Successfully fetched hashtags data",
-            'hashtagsData': hashtagsData
+            'hashtagsData': hashtagsData,
+            'usersProfileData': usersProfileData,
+            'usersSocialsData': usersSocialsData,
+            'postsData': completePostsList
         });
     }
     catch (error) {

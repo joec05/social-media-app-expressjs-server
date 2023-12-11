@@ -1100,9 +1100,6 @@ usersRoutes.get('/fetchFeed', async (req, res) => {
     const fetchFollowingData = await postsClient.query(fetchFollowingDataQuery, [
       userID, 0, maxFetchLimit, username, IP, PORT, password
     ]);
-    for(var i = 0; i < 50; i++){
-      
-    }
     const feedPosts : String[] = fetchFollowingData.rows.map((e) => e.post_data);
     const totalPostsLength = Math.min(maxFetchLimit, feedPosts.length);
     var modifiedFeedPosts = [...feedPosts];
@@ -1119,7 +1116,6 @@ usersRoutes.get('/fetchFeed', async (req, res) => {
       usersSocialsData.push(currentUserCompleteData.data.socials_data);
     }
 
-    
     res.json({
       'message': "Successfully fetched data",
       'usersProfileData': usersProfileData,
@@ -2408,7 +2404,7 @@ usersRoutes.get('/fetchSearchedUsers', async (req, res) => {
   } = req.body;
   
   try{
-    const fetchSearchedUsersDataQuery = `SELECT user_id FROM basic_data.user_profile WHERE lower(name) LIKE '%lower(${searchedText})%' OR username LIKE '%lower(${searchedText})%'`;
+    const fetchSearchedUsersDataQuery = `SELECT user_id FROM basic_data.user_profile WHERE name LIKE '%${searchedText}%' OR username LIKE '%${searchedText}%'`;
     const fetchSearchedUsersData = await profilesClient.query(fetchSearchedUsersDataQuery, []);
     var searchedUsersData : String[] = fetchSearchedUsersData.rows.map((e) => e.user_id);
     const totalUsersLength = searchedUsersData.length;
@@ -2758,19 +2754,55 @@ usersRoutes.get('/fetchSearchedTagUsers', async (req, res) => {
   }
 });
 
-usersRoutes.get('/fetchTopHashtags', async (req, res) => {
+usersRoutes.get('/fetchTopData', async (req, res) => {
   const {
+    currentID,
     paginationLimit
   } = req.body;
   
   try{
+
+    const fetchTopPostsQuery = `SELECT * FROM public."fetch_most_popular_posts"($1, $2, $3, $4, $5, $6)`;
+    const fetchTopPosts = await postsClient.query(fetchTopPostsQuery, [
+      currentID, paginationLimit,
+      username, IP, PORT, password
+    ]);
+    const postsList : String[] = fetchTopPosts.rows.map((e) => e.post_data);
+    var getCompletePostsData = await getPostsListFilteredData(postsList, currentID);
+    const completePostsList = getCompletePostsData.completeDataList; 
+
+    const fetchTopUsersQuery = `SELECT * FROM public."fetch_most_popular_users"($1, $2)`;
+    const fetchTopUsers = await profilesClient.query(fetchTopUsersQuery, [currentID, paginationLimit]);
+    const usersID : String[] = fetchTopUsers.rows.map((e) => e.user_id);
+    var getCompleteUsersData = await getUsersListFilteredData(usersID, currentID);
+
+    var combinedUsersID : any[] = [];
+    var combinedUsersProfileData : any[] = [...getCompleteUsersData.usersProfileData, ...getCompletePostsData.usersProfileData];
+    var combinedUsersSocialsData = [...getCompleteUsersData.usersSocialsData, ...getCompletePostsData.usersSocialsData];
+    var filteredUsersProfileData = [];
+    var filteredUsersSocialsData = [];
+    
+    for(var i = 0; i < combinedUsersProfileData.length; i++){
+      if(!combinedUsersID.includes(combinedUsersProfileData[i].user_id)){
+        combinedUsersID.push(combinedUsersProfileData[i].user_id);
+        filteredUsersProfileData.push(combinedUsersProfileData[i]);
+        filteredUsersSocialsData.push(combinedUsersSocialsData[i]);
+      }
+    }
+    
+    const usersProfileData = filteredUsersProfileData;
+    const usersSocialsData = filteredUsersSocialsData;
+
     const fetchHashtagsDataQuery = `SELECT * FROM hashtags.hashtags_list ORDER BY hashtag_count DESC OFFSET $1 LIMIT $2`;
     const fetchHashtagsData = await keywordsClient.query(fetchHashtagsDataQuery, [0, paginationLimit]);
     const hashtagsData : String[] = fetchHashtagsData.rows;
 
     res.json({
       'message': "Successfully fetched hashtags data",
-      'hashtagsData': hashtagsData
+      'hashtagsData': hashtagsData,
+      'usersProfileData': usersProfileData,
+      'usersSocialsData': usersSocialsData,
+      'postsData': completePostsList
     })
   } catch (error) {
     console.error('Error fetching hashtags data:', error);
