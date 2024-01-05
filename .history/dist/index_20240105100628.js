@@ -9,19 +9,13 @@ dotenv.config();
 const app = express();
 const hostname = '0.0.0.0';
 const port = 5001;
-
 app.use(cors());
-
 app.get('/', (req, res) => {
     res.send('Express + TypeScript Server');
 });
-
 app.use(bodyParser.json({ limit: "1gb" }));
-
 app.use(bodyParser.urlencoded({ limit: "1gb", extended: true, parameterLimit: 500000 }));
-
 var httpServer = createServer(app);
-
 const io = new Server(httpServer, {
     allowEIO3: true,
     maxHttpBufferSize: 1e8, pingTimeout: 60000,
@@ -32,13 +26,13 @@ const io = new Server(httpServer, {
         memLevel: 8,
     }
 });
-
 io.on("connection", (socket) => {
     console.log('Client connected.');
     socket.on('disconnect', function () {
         console.log('Client disconnected.');
     });
     socket.on("send-private-message-to-server", (data) => {
+        console.log(data);
         io.emit(`send-private-message-${data.sender}-${data.recipient}`, Object.assign({}, data));
         io.emit(`update-latest-private-message-${data.sender}`, Object.assign({}, data));
         io.emit(`update-latest-private-message-${data.recipient}`, Object.assign({}, data));
@@ -104,14 +98,11 @@ io.on("connection", (socket) => {
         io.emit(`update-unblock-sender-id-user-data-${data.unblockedUserID}`, Object.assign({}, data));
     });
 });
-
 app.get('/', (req, res) => {
     res.send({
         "success": true,
         "message": "Welcome to backend zone!"
     });
 });
-
 app.use('/users', usersRoutes);
-
 httpServer.listen(port, () => console.log(`Server running on port: http://localhost:${port}`));

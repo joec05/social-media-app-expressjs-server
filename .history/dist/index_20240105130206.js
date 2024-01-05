@@ -9,19 +9,13 @@ dotenv.config();
 const app = express();
 const hostname = '0.0.0.0';
 const port = 5001;
-
 app.use(cors());
-
 app.get('/', (req, res) => {
     res.send('Express + TypeScript Server');
 });
-
 app.use(bodyParser.json({ limit: "1gb" }));
-
 app.use(bodyParser.urlencoded({ limit: "1gb", extended: true, parameterLimit: 500000 }));
-
 var httpServer = createServer(app);
-
 const io = new Server(httpServer, {
     allowEIO3: true,
     maxHttpBufferSize: 1e8, pingTimeout: 60000,

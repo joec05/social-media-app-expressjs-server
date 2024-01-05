@@ -15,39 +15,39 @@ import { v4 as uuidv4 } from 'uuid';
 import pkg from 'pg';
 const { Client } = pkg;
 const username = 'joec05';
-const IP = '192.168.1.153';
+const IP = '192.168.43.56';
 const PORT = 5433;
 const password = 'josccarl123';
 const profilesDbConfig = {
-    host: '192.168.1.153',
+    host: '192.168.43.56',
     user: 'joec05',
     password: 'josccarl123',
     database: 'users_profiles',
     port: 5433
 };
 const postsDbConfig = {
-    host: '192.168.1.153',
+    host: '192.168.43.56',
     user: 'joec05',
     password: 'josccarl123',
     database: 'users_posts',
     port: 5433
 };
 const activitiesLogsDbConfig = {
-    host: '192.168.1.153',
+    host: '192.168.43.56',
     user: 'joec05',
     password: 'josccarl123',
     database: 'users_activities_logs',
     port: 5433
 };
 const keywordsDbConfig = {
-    host: '192.168.1.153',
+    host: '192.168.43.56',
     user: 'joec05',
     password: 'josccarl123',
     database: 'keywords',
     port: 5433
 };
 const chatsDbConfig = {
-    host: '192.168.1.153',
+    host: '192.168.43.56',
     user: 'joec05',
     password: 'josccarl123',
     database: 'users_chats',

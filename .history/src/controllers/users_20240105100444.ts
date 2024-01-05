@@ -6,50 +6,50 @@ import { v4 as uuidv4 } from 'uuid';
 import pkg from 'pg';
 const { Client } = pkg;
 
-const username = '';
+const username = 'joec05';
 
-const IP : String = '';
+const IP : String = '192.168.43.56';
 
 const PORT : number = 5433;
 
-const password : String = '';
+const password : String = 'josccarl123';
 
 const profilesDbConfig = {
-  host: '', // Your database host
-  user: '', // Your database username
-  password: '', // Your database password
+  host: IP, // Your database host
+  user: 'joec05', // Your database username
+  password: 'josccarl123', // Your database password
   database: 'users_profiles', // Your database name,
   port: 5433
 };
 
 const postsDbConfig = {
-  host: '', // Your database host
-  user: '', // Your database username
-  password: '', // Your database password
+  host: IP, // Your database host
+  user: 'joec05', // Your database username
+  password: 'josccarl123', // Your database password
   database: 'users_posts', // Your database name,
   port: 5433
 };
 
 const activitiesLogsDbConfig = {
-  host: '', // Your database host
-  user: '', // Your database username
-  password: '', // Your database password
+  host: IP, // Your database host
+  user: 'joec05', // Your database username
+  password: 'josccarl123', // Your database password
   database: 'users_activities_logs', // Your database name,
   port: 5433
 };
 
 const keywordsDbConfig = {
-  host: '', // Your database host
-  user: '', // Your database username
-  password: '', // Your database password
+  host: IP, // Your database host
+  user: 'joec05', // Your database username
+  password: 'josccarl123', // Your database password
   database: 'keywords', // Your database name,
   port: 5433
 };
 
 const chatsDbConfig = {
-  host: '', // Your database host
-  user: '', // Your database username
-  password: '', // Your database password
+  host: IP, // Your database host
+  user: 'joec05', // Your database username
+  password: 'josccarl123', // Your database password
   database: 'users_chats', // Your database name,
   port: 5433
 };
